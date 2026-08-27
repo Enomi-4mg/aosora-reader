@@ -74,6 +74,15 @@ function createWindow(): BrowserWindow {
     return { action: 'deny' }
   })
 
+  // setWindowOpenHandler は window.open しか止めない。
+  // ドロップされたファイルやリンクによるトップレベル遷移もここで塞ぐ。
+  win.webContents.on('will-navigate', (event, url) => {
+    const devServer = process.env.ELECTRON_RENDERER_URL
+    if (devServer && url.startsWith(devServer)) return
+    event.preventDefault()
+    if (/^https?:/.test(url)) void shell.openExternal(url)
+  })
+
   if (process.env.ELECTRON_RENDERER_URL) {
     void win.loadURL(process.env.ELECTRON_RENDERER_URL)
   } else {
