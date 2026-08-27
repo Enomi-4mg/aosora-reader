@@ -36,8 +36,10 @@ export class SearchService {
   constructor(private readonly db: Db) {}
 
   searchBook(bookId: string, query: string): SearchResult {
+    // 返す query は照合に使った trim 後の値。表示側はこの長さで一致部分を
+    // 切り出すので、生の入力を返すと前後の空白ぶんだけ強調がはみ出す。
     const q = query.trim()
-    if (q === '') return { query, count: 0, truncated: false, matches: [] }
+    if (q === '') return { query: q, count: 0, truncated: false, matches: [] }
 
     // 英数字は大文字小文字を無視する(要件 §4.12)。
     // SQLite の LIKE は既定で ASCII のみ大文字小文字を無視するので要件と一致する。
@@ -88,7 +90,7 @@ export class SearchService {
     }
 
     return {
-      query,
+      query: q,
       count: matches.length,
       truncated: matches.length >= MAX_MATCHES,
       matches
