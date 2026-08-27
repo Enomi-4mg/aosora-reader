@@ -76,6 +76,7 @@ export function normalizeSettings(raw: Partial<ReaderSettings> | null): ReaderSe
   const s = { ...DEFAULT_SETTINGS, ...(raw ?? {}) }
   return {
     ...s,
+    fontFamily: str(s.fontFamily, DEFAULT_SETTINGS.fontFamily),
     fontSize: clamp(num(s.fontSize, DEFAULT_SETTINGS.fontSize), FONT_SIZE_MIN, FONT_SIZE_MAX),
     fontWeight: clamp(num(s.fontWeight, 400), 100, 900),
     lineHeight: clamp(num(s.lineHeight, 1.9), LINE_HEIGHT_MIN, LINE_HEIGHT_MAX),
@@ -99,6 +100,10 @@ export function normalizeSettings(raw: Partial<ReaderSettings> | null): ReaderSe
 
 function num(v: unknown, fallback: number): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback
+}
+
+function str(v: unknown, fallback: string): string {
+  return typeof v === 'string' && v.trim() !== '' ? v : fallback
 }
 
 function clamp(v: number, lo: number, hi: number): number {
