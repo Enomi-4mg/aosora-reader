@@ -70,9 +70,13 @@ export class AnnotationRepository {
     const start = input.range?.start ?? input.position ?? null
     const end = input.range?.end ?? null
     if (input.id) {
-      this.db.prepare('UPDATE notes SET text = ?, updated_at = ? WHERE id = ?')
-        .run(input.text, now, input.id)
-      return this.listNotes(input.bookId).find((n) => n.id === input.id)!
+      this.db.prepare('UPDATE notes SET text = ?, updated_at = ? WHERE id = ? AND book_id = ?')
+        .run(input.text, now, input.id, input.bookId)
+      const updated = this.findNote(input.bookId, input.id)
+      // 対象が消えていたら undefined を Note として返さない。
+      // renderer 側の一覧に undefined が混ざると描画ごと落ちる。
+      if (!updated) throw new Error('メモが見つかりませんでした。')
+      return updated
     }
     const value: Note = {
       id: randomUUID(), bookId: input.bookId, highlightId: input.highlightId ?? null,
@@ -119,20 +123,17 @@ export class AnnotationRepository {
     })
   }
 
+  private findNote(bookId: string, id: string): Note | null {
+    const r = this.db.prepare('SELECT * FROM notes WHERE id = ? AND book_id = ?')
+      .get(id, bookId) as Record<string, unknown> | undefined
+    return r ? noteFromRow(bookId, r) : null
+  }
+
   private listNotes(bookId: string): Note[] {
     const rows = this.db.prepare(
       'SELECT * FROM notes WHERE book_id = ? ORDER BY created_at'
     ).all(bookId) as unknown as Array<Record<string, unknown>>
-    return rows.map((r) => {
-      const start = r.block_id ? pos(bookId, r, '') : null
-      const end = r.end_block_id ? pos(bookId, r, 'end_') : null
-      return {
-        id: r.id as string, bookId, highlightId: (r.highlight_id as string | null) ?? null,
-        range: start && end ? { start, end } : null,
-        position: start && !end ? start : null,
-        text: r.text as string, createdAt: r.created_at as string, updatedAt: r.updated_at as string
-      }
-    })
+    return rows.map((r) => noteFromRow(bookId, r))
   }
 
   private rangeExists(range: TextRange): boolean {
@@ -204,6 +205,17 @@ function positionAt(bookId: string, rows: BlockRow[], starts: number[], offset: 
     }
   }
   return null
+}
+
+function noteFromRow(bookId: string, r: Record<string, unknown>): Note {
+  const start = r.block_id ? pos(bookId, r, '') : null
+  const end = r.end_block_id ? pos(bookId, r, 'end_') : null
+  return {
+    id: r.id as string, bookId, highlightId: (r.highlight_id as string | null) ?? null,
+    range: start && end ? { start, end } : null,
+    position: start && !end ? start : null,
+    text: r.text as string, createdAt: r.created_at as string, updatedAt: r.updated_at as string
+  }
 }
 
 function pos(bookId: string, row: Record<string, unknown>, prefix: string): TextPosition {

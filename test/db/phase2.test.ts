@@ -89,3 +89,26 @@ describe('reading sessions', () => {
     expect(stats.estimatedCharsPerMinute).toBeGreaterThan(400)
   })
 })
+
+describe('メモの更新', () => {
+  const at = (offset: number) => ({
+    bookId: book.id,
+    chapterId: book.chapters[0]!.id,
+    blockId: book.chapters[0]!.blocks.find((b) => b.plainText.length > 0)!.id,
+    offset
+  })
+
+  it('存在しない id の更新は undefined を返さず例外にする', () => {
+    const repo = new AnnotationRepository(db)
+    expect(() => repo.saveNote({ id: 'missing', bookId: book.id, text: 'あとで' })).toThrow()
+  })
+
+  it('既存メモを更新すると更新後の内容を返す', () => {
+    const repo = new AnnotationRepository(db)
+    const created = repo.saveNote({ bookId: book.id, position: at(0), text: 'さいしょ' })
+    const updated = repo.saveNote({ id: created.id, bookId: book.id, text: 'あとで' })
+    expect(updated.id).toBe(created.id)
+    expect(updated.text).toBe('あとで')
+    expect(repo.list(book.id).notes).toHaveLength(1)
+  })
+})
