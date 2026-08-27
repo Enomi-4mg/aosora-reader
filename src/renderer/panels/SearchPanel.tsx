@@ -63,8 +63,8 @@ export function SearchPanel({ onJump }: Props): JSX.Element {
                 className={i === store.searchCursor ? 'current' : ''}
                 onClick={() => onJump(chapterIndexOf(m.chapterId), m.position)}
               >
-                <mark>{m.context.slice(m.contextOffset, m.contextOffset + result.query.length)}</mark>
                 <span className="ctx-before">{m.context.slice(0, m.contextOffset)}</span>
+                <mark>{m.context.slice(m.contextOffset, m.contextOffset + result.query.length)}</mark>
                 <span className="ctx-after">
                   {m.context.slice(m.contextOffset + result.query.length)}
                 </span>
