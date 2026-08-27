@@ -138,5 +138,21 @@ CREATE TABLE reading_sessions (
 );
 CREATE INDEX idx_sessions_book ON reading_sessions(book_id);
 `
+  },
+  {
+    version: 2,
+    name: 'phase2-ranges-and-sessions',
+    sql: `
+ALTER TABLE notes ADD COLUMN end_chapter_id TEXT;
+ALTER TABLE notes ADD COLUMN end_block_id TEXT;
+ALTER TABLE notes ADD COLUMN end_offset INTEGER;
+
+ALTER TABLE reading_sessions ADD COLUMN start_chapter_id TEXT;
+ALTER TABLE reading_sessions ADD COLUMN start_block_id TEXT;
+ALTER TABLE reading_sessions ADD COLUMN start_offset INTEGER;
+ALTER TABLE reading_sessions ADD COLUMN end_chapter_id TEXT;
+ALTER TABLE reading_sessions ADD COLUMN end_block_id TEXT;
+ALTER TABLE reading_sessions ADD COLUMN end_offset INTEGER;
+`
   }
 ]

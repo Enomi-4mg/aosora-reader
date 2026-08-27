@@ -70,7 +70,7 @@ beforeEach(() => {
 describe('マイグレーション', () => {
   it('user_version が進む', () => {
     const v = db.prepare('PRAGMA user_version').get() as { user_version: number }
-    expect(v.user_version).toBe(1)
+    expect(v.user_version).toBe(2)
   })
 
   it('再実行しても壊れない', () => {

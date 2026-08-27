@@ -30,6 +30,13 @@ export interface ReaderSettings {
   columns: ColumnCount
   /** ページ送りのアニメーション(ms)。0 で無効。 */
   pageTransitionMs: number
+  /** OS TTS の voiceURI。空文字は OS 既定。 */
+  ttsVoice: string
+  ttsRate: number
+  ttsPitch: number
+  ttsVolume: number
+  /** 読了時間推定の初期値兼、実測値が無い場合の値。 */
+  estimatedCharsPerMinute: number
 }
 
 export const DEFAULT_SETTINGS: ReaderSettings = {
@@ -45,7 +52,12 @@ export const DEFAULT_SETTINGS: ReaderSettings = {
   readingMode: 'pagination',
   theme: 'system',
   columns: 1,
-  pageTransitionMs: 180
+  pageTransitionMs: 180,
+  ttsVoice: '',
+  ttsRate: 1,
+  ttsPitch: 1,
+  ttsVolume: 1,
+  estimatedCharsPerMinute: 500
 }
 
 export const FONT_SIZE_MIN = 12
@@ -76,7 +88,12 @@ export function normalizeSettings(raw: Partial<ReaderSettings> | null): ReaderSe
     theme: (['light', 'sepia', 'dark', 'system'] as const).includes(s.theme)
       ? s.theme
       : 'system',
-    pageTransitionMs: clamp(num(s.pageTransitionMs, 180), 0, 600)
+    pageTransitionMs: clamp(num(s.pageTransitionMs, 180), 0, 600),
+    ttsVoice: typeof s.ttsVoice === 'string' ? s.ttsVoice : '',
+    ttsRate: clamp(num(s.ttsRate, 1), 0.5, 2),
+    ttsPitch: clamp(num(s.ttsPitch, 1), 0.5, 2),
+    ttsVolume: clamp(num(s.ttsVolume, 1), 0, 1),
+    estimatedCharsPerMinute: clamp(num(s.estimatedCharsPerMinute, 500), 100, 2000)
   }
 }
 

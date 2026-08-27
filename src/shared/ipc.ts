@@ -5,6 +5,16 @@
 import type { Book, BookSummary } from './model/document'
 import type { TextPosition } from './model/position'
 import type { ReaderSettings } from './model/settings'
+import type {
+  AnnotationBundle,
+  Bookmark,
+  DictionaryResult,
+  Highlight,
+  Note,
+  ReadingStats
+} from './model/annotations'
+import type { TextRange } from './model/position'
+import type { HighlightColor } from './model/settings'
 
 export interface ImportIssueSummary {
   kind: string
@@ -68,6 +78,32 @@ export interface AozoraIpcApi {
   saveProgress(p: ReadingProgressDto): Promise<void>
   searchBook(bookId: string, query: string): Promise<SearchResultDto>
 
+  listAnnotations(bookId: string): Promise<AnnotationBundle>
+  addBookmark(bookId: string, position: TextPosition, label: string): Promise<Bookmark>
+  updateBookmark(id: string, label: string): Promise<void>
+  deleteBookmark(id: string): Promise<void>
+  addHighlight(bookId: string, range: TextRange, selectedText: string, color: HighlightColor): Promise<Highlight>
+  deleteHighlight(id: string): Promise<void>
+  saveNote(input: {
+    id?: string
+    bookId: string
+    highlightId?: string | null
+    range?: TextRange | null
+    position?: TextPosition | null
+    text: string
+  }): Promise<Note>
+  deleteNote(id: string): Promise<void>
+
+  startReadingSession(bookId: string, position: TextPosition, percentage: number): Promise<string>
+  closeReadingSession(id: string, position: TextPosition, percentage: number, charactersRead: number): Promise<void>
+  getReadingStats(bookId: string, fallbackCpm: number): Promise<ReadingStats>
+  searchDictionary(term: string): Promise<DictionaryResult>
+  copyText(text: string): Promise<void>
+  setFullscreen(enabled: boolean): Promise<boolean>
+  getFullscreen(): Promise<boolean>
+  getDataLocation(): Promise<string>
+  revealDataLocation(): Promise<void>
+
   getSettings(): Promise<ReaderSettings>
   saveSettings(patch: Partial<ReaderSettings>): Promise<ReaderSettings>
 }
@@ -89,6 +125,23 @@ export const IPC_CHANNELS = [
   'openBook',
   'saveProgress',
   'searchBook',
+  'listAnnotations',
+  'addBookmark',
+  'updateBookmark',
+  'deleteBookmark',
+  'addHighlight',
+  'deleteHighlight',
+  'saveNote',
+  'deleteNote',
+  'startReadingSession',
+  'closeReadingSession',
+  'getReadingStats',
+  'searchDictionary',
+  'copyText',
+  'setFullscreen',
+  'getFullscreen',
+  'getDataLocation',
+  'revealDataLocation',
   'getSettings',
   'saveSettings'
 ] as const satisfies ReadonlyArray<keyof AozoraIpcApi>

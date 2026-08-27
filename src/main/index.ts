@@ -1,7 +1,7 @@
 /**
  * Electron main プロセス。fs / SQLite / パーサーはすべてこちら側に閉じる。
  */
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, net, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, net, shell } from 'electron'
 import { join } from 'node:path'
 import { normalizeSettings, type ReaderSettings } from '@shared/model/settings'
 import type { AozoraIpcApi, ImportOutcome, OpenBookResult } from '@shared/ipc'
@@ -9,10 +9,13 @@ import { openDatabase, type Db } from './db/connection'
 import { BookRepository } from './repositories/BookRepository'
 import { ProgressRepository } from './repositories/ProgressRepository'
 import { SettingsRepository } from './repositories/SettingsRepository'
+import { AnnotationRepository } from './repositories/AnnotationRepository'
+import { ReadingSessionRepository } from './repositories/ReadingSessionRepository'
 import { ImportService, type ImportOutcome as ServiceOutcome } from './services/ImportService'
 import { SearchService } from './services/SearchService'
 import { AozoraCatalogService } from './services/AozoraCatalogService'
 import type { SupportedEncoding } from './import/decode'
+import { WiktionaryProvider } from './services/DictionaryService'
 
 let db: Db
 let books: BookRepository
@@ -21,6 +24,9 @@ let settings: SettingsRepository
 let importer: ImportService
 let search: SearchService
 let catalog: AozoraCatalogService
+let annotations: AnnotationRepository
+let sessions: ReadingSessionRepository
+let dictionary: WiktionaryProvider
 
 function initServices(): void {
   db = openDatabase(join(app.getPath('userData'), 'library.db'))
@@ -33,6 +39,13 @@ function initServices(): void {
     const response = await net.fetch(url, { signal: AbortSignal.timeout(30_000) })
     if (!response.ok) throw new Error(`青空文庫から取得できませんでした (${response.status})`)
     return new Uint8Array(await response.arrayBuffer())
+  })
+  annotations = new AnnotationRepository(db)
+  sessions = new ReadingSessionRepository(db)
+  dictionary = new WiktionaryProvider(async (url) => {
+    const response = await net.fetch(url, { signal: AbortSignal.timeout(10_000) })
+    if (!response.ok) throw new Error(`辞書を検索できませんでした (${response.status})`)
+    return response.json()
   })
 }
 
@@ -143,6 +156,82 @@ const handlers: AozoraIpcApi = {
 
   async searchBook(bookId: string, query: string) {
     return search.searchBook(bookId, query)
+  },
+
+  async listAnnotations(bookId) {
+    return annotations.list(bookId)
+  },
+
+  async addBookmark(bookId, position, label) {
+    return annotations.addBookmark(bookId, position, label)
+  },
+
+  async updateBookmark(id, label) {
+    annotations.updateBookmark(id, label)
+  },
+
+  async deleteBookmark(id) {
+    annotations.deleteBookmark(id)
+  },
+
+  async addHighlight(bookId, range, selectedText, color) {
+    return annotations.addHighlight(bookId, range, selectedText, color)
+  },
+
+  async deleteHighlight(id) {
+    annotations.deleteHighlight(id)
+  },
+
+  async saveNote(input) {
+    return annotations.saveNote(input)
+  },
+
+  async deleteNote(id) {
+    annotations.deleteNote(id)
+  },
+
+  async startReadingSession(bookId, position, percentage) {
+    return sessions.start(bookId, position, percentage)
+  },
+
+  async closeReadingSession(id, position, percentage, charactersRead) {
+    sessions.close(id, position, percentage, charactersRead)
+  },
+
+  async getReadingStats(bookId, fallbackCpm) {
+    return sessions.stats(bookId, fallbackCpm)
+  },
+
+  async searchDictionary(term) {
+    try {
+      return await dictionary.search(term)
+    } catch (error) {
+      console.error('[dictionary]', error)
+      return { term, definitions: [], source: '日本語版Wiktionary' }
+    }
+  },
+
+  async copyText(text) {
+    clipboard.writeText(text)
+  },
+
+  async setFullscreen(enabled) {
+    const win = BrowserWindow.getFocusedWindow()
+    if (!win) return false
+    win.setFullScreen(enabled)
+    return win.isFullScreen()
+  },
+
+  async getFullscreen() {
+    return BrowserWindow.getFocusedWindow()?.isFullScreen() ?? false
+  },
+
+  async getDataLocation() {
+    return app.getPath('userData')
+  },
+
+  async revealDataLocation() {
+    await shell.openPath(app.getPath('userData'))
   },
 
   async getSettings(): Promise<ReaderSettings> {
