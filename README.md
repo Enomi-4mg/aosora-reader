@@ -89,7 +89,7 @@ blockId が変わって既存のハイライトが orphan 化するのを防ぐ�
 ## 検証
 
 ```bash
-npm test                                        # ユニットテスト 95件
+npm test                                        # ユニットテスト 101件
 npx vite-node scripts/probe-samples.mjs <dir>   # 実ファイルのパース検査
 npm run build && npx electron scripts/e2e-reader.mjs <dir>   # 実機での §17 検証 22件
 ```
