@@ -24,7 +24,7 @@ const THEMES: Array<[ThemeName, string]> = [
 ]
 
 export function SettingsPanel({ onClose }: { onClose: () => void }): JSX.Element {
-  const { settings, patch, reset } = useSettingsStore()
+  const { settings, patch, reset, error } = useSettingsStore()
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
   const [dataLocation, setDataLocation] = useState('')
   const set = <K extends keyof ReaderSettings>(k: K, v: ReaderSettings[K]) =>
@@ -46,6 +46,8 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): JSX.Element
         <h2>表示設定</h2>
         <button className="ghost" onClick={onClose} aria-label="設定を閉じる">×</button>
       </div>
+
+      {error && <p className="panel-error" role="alert">{error}</p>}
 
       <section>
         <h3>組み方</h3>

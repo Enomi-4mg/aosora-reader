@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS, FONT_SIZE_MAX, FONT_SIZE_MIN, FONT_SIZE_STEP, type Re
 interface SettingsState {
   settings: ReaderSettings
   loaded: boolean
+  error: string | null
   load: () => Promise<void>
   patch: (p: Partial<ReaderSettings>) => Promise<void>
   adjustFontSize: (delta: number) => Promise<void>
@@ -12,13 +13,27 @@ interface SettingsState {
   reset: () => Promise<void>
 }
 
+function message(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback
+}
+
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   settings: DEFAULT_SETTINGS,
   loaded: false,
+  error: null,
 
   async load() {
-    const s = await window.aozora.getSettings()
-    set({ settings: s, loaded: true })
+    try {
+      set({ settings: await window.aozora.getSettings(), loaded: true, error: null })
+    } catch (error) {
+      // 設定を読めなくても既定値で起動する(要件 §9)。
+      // ここで loaded を false のままにすると「起動中…」から先へ進めなくなる。
+      set({
+        settings: DEFAULT_SETTINGS,
+        loaded: true,
+        error: message(error, '設定を読み込めませんでした。既定値で起動しています。')
+      })
+    }
   },
 
   async patch(p) {
