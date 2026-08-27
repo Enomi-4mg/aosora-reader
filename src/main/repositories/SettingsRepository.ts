@@ -2,7 +2,7 @@
  * 設定の永続化(要件 §4.7)。
  * key-value にしておくことで、将来の作品別上書きをスキーマ変更なしで足せる。
  */
-import type { Db } from '../db/connection'
+import { transaction, type Db } from '../db/connection'
 
 export class SettingsRepository {
   constructor(private readonly db: Db) {}
@@ -23,12 +23,18 @@ export class SettingsRepository {
     return out
   }
 
+  /**
+   * 設定は毎回まとめて書き直される。1件ずつ暗黙のトランザクションで書くと
+   * キー数ぶんのコミットになるので、必ず1トランザクションにまとめる。
+   */
   setMany(values: Record<string, unknown>): void {
-    const stmt = this.db.prepare(
-      `INSERT INTO settings (key, value_json) VALUES (?, ?)
-       ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json`
-    )
-    for (const [k, v] of Object.entries(values)) stmt.run(k, JSON.stringify(v))
+    transaction(this.db, () => {
+      const stmt = this.db.prepare(
+        `INSERT INTO settings (key, value_json) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json`
+      )
+      for (const [k, v] of Object.entries(values)) stmt.run(k, JSON.stringify(v))
+    })
   }
 
   clear(): void {
