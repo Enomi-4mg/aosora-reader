@@ -4,6 +4,8 @@ import { useSettingsStore } from '../state/useSettingsStore'
 import {
   FONT_SIZE_MAX,
   FONT_SIZE_MIN,
+  LINE_HEIGHT_MAX,
+  LINE_HEIGHT_MIN,
   type ReaderSettings,
   type ThemeName
 } from '@shared/model/settings'
@@ -110,8 +112,8 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): JSX.Element
         <Range
           label="行間"
           value={settings.lineHeight}
-          min={1.2}
-          max={3.2}
+          min={LINE_HEIGHT_MIN}
+          max={LINE_HEIGHT_MAX}
           step={0.05}
           onChange={(v) => set('lineHeight', v)}
         />

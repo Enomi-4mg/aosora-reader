@@ -52,6 +52,13 @@ export const FONT_SIZE_MIN = 12
 export const FONT_SIZE_MAX = 48
 export const FONT_SIZE_STEP = 2
 
+/**
+ * 行間の下限。1.2 まで詰められると、ルビが隣の行に接触して読めなくなる
+ * (本文18px + ルビ9px = 27px に対し、行送りが 21.6px しか無い)。
+ */
+export const LINE_HEIGHT_MIN = 1.5
+export const LINE_HEIGHT_MAX = 3.2
+
 /** 保存値が壊れていてもアプリを止めない(要件 §9)。 */
 export function normalizeSettings(raw: Partial<ReaderSettings> | null): ReaderSettings {
   const s = { ...DEFAULT_SETTINGS, ...(raw ?? {}) }
@@ -59,7 +66,7 @@ export function normalizeSettings(raw: Partial<ReaderSettings> | null): ReaderSe
     ...s,
     fontSize: clamp(num(s.fontSize, DEFAULT_SETTINGS.fontSize), FONT_SIZE_MIN, FONT_SIZE_MAX),
     fontWeight: clamp(num(s.fontWeight, 400), 100, 900),
-    lineHeight: clamp(num(s.lineHeight, 1.9), 1.2, 3.2),
+    lineHeight: clamp(num(s.lineHeight, 1.9), LINE_HEIGHT_MIN, LINE_HEIGHT_MAX),
     letterSpacing: clamp(num(s.letterSpacing, 0.05), -0.1, 0.6),
     pageMargin: clamp(num(s.pageMargin, 56), 0, 200),
     paragraphSpacing: clamp(num(s.paragraphSpacing, 0), 0, 4),

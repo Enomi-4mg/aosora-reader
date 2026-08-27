@@ -163,9 +163,21 @@
   font-size: 0.85em;
 }
 
-/* ルビ */
+/*
+ * ルビ。
+ *
+ * 印刷では親文字の 0.5 倍が慣習だが、画面ではそのままだと小さすぎる。
+ * 本文 12px のとき 6px になり判読できない(実測)。下限 8px を保証する。
+ * line-height: 1 はルビ側の余分なリーディングを取り除き、
+ * 行間を詰めたときに隣の行へ食い込みにくくするため。
+ */
 ruby { ruby-align: center; }
-rt { font-size: 0.5em; letter-spacing: 0; opacity: 0.85; }
+rt {
+  font-size: max(8px, 0.5em);
+  line-height: 1;
+  letter-spacing: 0;
+  opacity: 0.85;
+}
 
 /* 傍点(要件 §4.2)。縦書きでは右側、横書きでは上側に付く。 */
 .em { text-emphasis-position: over right; }
