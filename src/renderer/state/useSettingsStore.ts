@@ -13,6 +13,9 @@ interface SettingsState {
   reset: () => Promise<void>
 }
 
+/** 保存要求の順序。応答が前後しても古い結果で上書きさせない。 */
+let latestSave = 0
+
 function message(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback
 }
@@ -38,9 +41,18 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   async patch(p) {
     // 先にローカルへ反映してリアルタイム感を出し、永続化は後追いにする
-    set({ settings: { ...get().settings, ...p } })
-    const saved = await window.aozora.saveSettings(p)
-    set({ settings: saved })
+    const previous = get().settings
+    set({ settings: { ...previous, ...p }, error: null })
+    const request = ++latestSave
+    try {
+      const saved = await window.aozora.saveSettings(p)
+      // 連打で応答が前後しても、最後に投げた要求の結果だけを採用する
+      if (request === latestSave) set({ settings: saved })
+    } catch (error) {
+      if (request === latestSave) {
+        set({ settings: previous, error: message(error, '設定を保存できませんでした。') })
+      }
+    }
   },
 
   async adjustFontSize(delta) {
@@ -56,7 +68,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   async reset() {
-    const saved = await window.aozora.saveSettings(DEFAULT_SETTINGS)
-    set({ settings: saved })
+    await get().patch(DEFAULT_SETTINGS)
   }
 }))
