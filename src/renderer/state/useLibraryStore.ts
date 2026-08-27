@@ -51,7 +51,12 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   notice: null,
 
   async refresh() {
-    set({ books: await window.aozora.listBooks() })
+    try {
+      set({ books: await window.aozora.listBooks() })
+    } catch (e) {
+      // 一覧を読めなくても本棚画面は出す(要件 §9)
+      set({ notice: e instanceof Error ? e.message : '本棚を読み込めませんでした。' })
+    }
   },
 
   async importDialog() {
@@ -96,7 +101,11 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   },
 
   async remove(bookId, keepUserData) {
-    await window.aozora.deleteBook(bookId, keepUserData)
+    try {
+      await window.aozora.deleteBook(bookId, keepUserData)
+    } catch (e) {
+      set({ notice: e instanceof Error ? e.message : '削除できませんでした。' })
+    }
     await get().refresh()
   },
 

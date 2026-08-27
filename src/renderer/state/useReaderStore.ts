@@ -37,6 +37,8 @@ interface ReaderState {
   searchQuery: string
   searchResult: SearchResultDto | null
   searchCursor: number
+  /** 検索だけの失敗。本文表示は続けるので error とは分けて持つ。 */
+  searchError: string | null
 
   open: (bookId: string) => Promise<void>
   close: () => void
@@ -73,6 +75,7 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
   searchQuery: '',
   searchResult: null,
   searchCursor: 0,
+  searchError: null,
 
   async open(bookId) {
     latestSearchRequest++
@@ -117,6 +120,7 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
       searchOpen: false,
       searchResult: null,
       searchQuery: '',
+      searchError: null,
       focusMode: false
     })
   },
@@ -146,12 +150,25 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
   async runSearch(q) {
     const request = ++latestSearchRequest
     const { book } = get()
-    set({ searchQuery: q })
+    set({ searchQuery: q, searchError: null })
     if (!book || q.trim() === '') {
       set({ searchResult: null, searchCursor: 0 })
       return
     }
-    const r = await window.aozora.searchBook(book.id, q)
+    let r: SearchResultDto
+    try {
+      r = await window.aozora.searchBook(book.id, q)
+    } catch (e) {
+      // 検索が失敗しても本文閲覧は続けられるようにする(要件 §9)
+      if (request === latestSearchRequest) {
+        set({
+          searchResult: null,
+          searchCursor: 0,
+          searchError: e instanceof Error ? e.message : '検索できませんでした。'
+        })
+      }
+      return
+    }
     if (
       request !== latestSearchRequest ||
       get().book?.id !== book.id ||

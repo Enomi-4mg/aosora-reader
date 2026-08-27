@@ -55,6 +55,8 @@ export function SearchPanel({ onJump }: Props): JSX.Element {
         <button className="ghost" onClick={store.closeSearch} aria-label="検索を閉じる">×</button>
       </div>
 
+      {store.searchError && <p className="panel-error" role="alert">{store.searchError}</p>}
+
       {result && (
         <div className="search-popover">
           {result.count === 0 ? (
