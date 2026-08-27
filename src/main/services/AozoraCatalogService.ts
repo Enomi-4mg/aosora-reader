@@ -12,6 +12,8 @@ type FetchBytes = (url: string) => Promise<Uint8Array>
 interface CatalogEntry extends AozoraCatalogWork {
   textUrl: string
   searchText: string
+  /** 著者の読み。Book.metadata へ渡すだけで、renderer の検索結果には出さない。 */
+  authorKana: string
 }
 
 /** 青空文庫の公式公開カタログを検索し、作品 ZIP を既存の ImportService へ渡す。 */
@@ -32,7 +34,7 @@ export class AozoraCatalogService {
       .filter((entry) => entry.searchText.includes(needle))
       .sort((a, b) => score(a, needle) - score(b, needle) || a.title.localeCompare(b.title, 'ja'))
       .slice(0, MAX_RESULTS)
-      .map(({ textUrl: _textUrl, searchText: _searchText, ...work }) => work)
+      .map(({ textUrl: _textUrl, searchText: _searchText, authorKana: _authorKana, ...work }) => work)
   }
 
   async download(workId: string): Promise<ImportOutcome> {
@@ -43,7 +45,14 @@ export class AozoraCatalogService {
 
     assertOfficialUrl(entry.textUrl)
     const bytes = await this.fetchBytes(entry.textUrl)
-    return this.importer.importBytes(bytes, entry.textUrl, entry.title)
+    // 図書カード URL と読み仮名は本文に書かれていない。カタログにあるうちに渡す。
+    return this.importer.importBytes(bytes, entry.textUrl, entry.title, {
+      metadata: {
+        ...(entry.cardUrl ? { aozoraUrl: entry.cardUrl } : {}),
+        ...(entry.titleKana ? { titleKana: entry.titleKana } : {}),
+        ...(entry.authorKana ? { authorKana: entry.authorKana } : {})
+      }
+    })
   }
 
   private catalog(): Promise<CatalogEntry[]> {
@@ -72,7 +81,11 @@ export function parseAozoraCatalog(csv: string): CatalogEntry[] {
   if (!header) return []
   const col = new Map(header.map((name, index) => [name, index]))
   const value = (row: string[], name: string): string => row[col.get(name) ?? -1] ?? ''
-  const grouped = new Map<string, CatalogEntry & { authors: Set<string>; translators: Set<string> }>()
+  const grouped = new Map<string, CatalogEntry & {
+    authors: Set<string>
+    translators: Set<string>
+    authorKanaSet: Set<string>
+  }>()
 
   for (const row of rows) {
     const id = value(row, '作品ID')
@@ -86,6 +99,7 @@ export function parseAozoraCatalog(csv: string): CatalogEntry[] {
     }
 
     const name = [value(row, '姓'), value(row, '名')].filter(Boolean).join(' ')
+    const kana = [value(row, '姓読み'), value(row, '名読み')].filter(Boolean).join(' ')
     const role = value(row, '役割フラグ')
     let entry = grouped.get(id)
     if (!entry) {
@@ -98,21 +112,30 @@ export function parseAozoraCatalog(csv: string): CatalogEntry[] {
         cardUrl: value(row, '図書カードURL'),
         textUrl,
         searchText: '',
+        authorKana: '',
         authors: new Set(),
-        translators: new Set()
+        translators: new Set(),
+        authorKanaSet: new Set()
       }
       grouped.set(id, entry)
     }
     if (name && role === '著者') entry.authors.add(name)
     if (name && role === '翻訳者') entry.translators.add(name)
+    if (kana && role === '著者') entry.authorKanaSet.add(kana)
   }
 
   return Array.from(grouped.values(), (entry) => {
     const authorParts = [...entry.authors]
     if (entry.translators.size > 0) authorParts.push(`${[...entry.translators].join('・')} 訳`)
     entry.author = authorParts.join(' / ') || '著者不明'
+    entry.authorKana = [...entry.authorKanaSet].join(' / ')
     entry.searchText = normalize([entry.title, entry.titleKana, entry.author, entry.id].join(' '))
-    const { authors: _authors, translators: _translators, ...plain } = entry
+    const {
+      authors: _authors,
+      translators: _translators,
+      authorKanaSet: _authorKanaSet,
+      ...plain
+    } = entry
     return plain
   })
 }

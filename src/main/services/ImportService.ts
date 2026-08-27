@@ -7,7 +7,7 @@
  */
 import { readFile } from 'node:fs/promises'
 import { basename, extname } from 'node:path'
-import type { Book, SourceType } from '@shared/model/document'
+import type { Book, BookMetadata, SourceType } from '@shared/model/document'
 import { parseAozora, type ParseIssue } from '@shared/parser'
 import { decodeAozoraText, decodeWith, type SupportedEncoding } from '../import/decode'
 import { readAozoraZip, ZipError } from '../import/zip'
@@ -52,19 +52,27 @@ export class ImportService {
   ): Promise<ImportOutcome> {
     try {
       const raw = new Uint8Array(await readFile(path))
-      return await this.importBytes(raw, path, basename(path, extname(path)), forcedEncoding)
+      return await this.importBytes(raw, path, basename(path, extname(path)), { forcedEncoding })
     } catch (e) {
       return this.error(path, e)
     }
   }
 
-  /** ダウンロード済みの公式作品を、ローカルファイルと同じ経路で取り込む。 */
+  /**
+   * ダウンロード済みの公式作品を、ローカルファイルと同じ経路で取り込む。
+   * @param options.metadata 本文からは読み取れない、取り込み元由来の情報
+   *   (図書カード URL や読み仮名)。パース結果より優先する。
+   */
   async importBytes(
     raw: Uint8Array,
     sourcePath: string,
     fallbackTitle: string,
-    forcedEncoding?: SupportedEncoding
+    options: {
+      forcedEncoding?: SupportedEncoding
+      metadata?: Partial<BookMetadata>
+    } = {}
   ): Promise<ImportOutcome> {
+    const { forcedEncoding } = options
     try {
       const ext = extensionOf(sourcePath)
 
@@ -113,7 +121,7 @@ export class ImportService {
         sourceType,
         encoding,
         sourceHash,
-        metadata: parsed.metadata,
+        metadata: { ...parsed.metadata, ...options.metadata },
         chapters: parsed.chapters,
         totalCharacters: parsed.totalCharacters,
         importedAt: now,
