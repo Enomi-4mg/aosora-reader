@@ -2,6 +2,7 @@
 import { useEffect, useState, type JSX } from 'react'
 import { useSettingsStore } from '../state/useSettingsStore'
 import {
+  DEFAULT_SETTINGS,
   FONT_SIZE_MAX,
   FONT_SIZE_MIN,
   LINE_HEIGHT_MAX,
@@ -10,8 +11,10 @@ import {
   type ThemeName
 } from '@shared/model/settings'
 
+// 先頭は必ず既定値と同一文字列にする。ずれると初回起動時に
+// <select> がどの <option> とも一致せず、現在の書体を表示できない。
 const FONTS: Array<[string, string]> = [
-  ['"Hiragino Mincho ProN", "YuMincho", "Noto Serif JP", serif', '明朝体'],
+  [DEFAULT_SETTINGS.fontFamily, '明朝体'],
   ['"Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif', 'ゴシック体'],
   ['"Hiragino Maru Gothic ProN", "Yu Gothic", sans-serif', '丸ゴシック']
 ]
@@ -83,10 +86,12 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): JSX.Element
             スクロール
           </button>
         </div>
+        {/* 段組みは multicolumn を使う横書きのみ。縦書きは block progression で送る。 */}
         <div className="seg" role="group" aria-label="段組み">
           <button
             className={settings.columns === 1 ? 'on' : ''}
             aria-pressed={settings.columns === 1}
+            disabled={settings.writingMode === 'vertical'}
             onClick={() => set('columns', 1)}
           >
             1段
@@ -94,11 +99,15 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): JSX.Element
           <button
             className={settings.columns === 2 ? 'on' : ''}
             aria-pressed={settings.columns === 2}
+            disabled={settings.writingMode === 'vertical'}
             onClick={() => set('columns', 2)}
           >
             2段
           </button>
         </div>
+        {settings.writingMode === 'vertical' && (
+          <p className="muted small">段組みは横書きのときだけ使えます。</p>
+        )}
       </section>
 
       <section>
