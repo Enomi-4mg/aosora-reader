@@ -67,6 +67,19 @@ app.whenReady().then(async () => {
   const target = [...books].sort((a, b) => b.totalCharacters - a.totalCharacters)[0]
   console.log(`  (検証対象: ${target.title} / ${target.totalCharacters}字)`)
 
+  console.log('\n== 青空文庫から追加 ==')
+  const catalog = await js(`window.aozora.searchAozoraCatalog('こころ')`)
+  const kokoro = catalog.find((x) => x.title === 'こころ' && x.author.includes('夏目'))
+  check('公式カタログをタイトル・著者で検索できる', !!kokoro, `${catalog.length}件`)
+  if (kokoro) {
+    const downloaded = await js(`window.aozora.downloadAozoraWork(${JSON.stringify(kokoro.id)})`)
+    check(
+      '公式作品ZIPを直接取り込める',
+      ['imported', 'restored', 'duplicate'].includes(downloaded.status),
+      downloaded.status
+    )
+  }
+
   console.log('\n== 本文表示 ==')
   await js(`window.aozora.saveSettings({writingMode:'vertical',readingMode:'pagination',columns:1,fontSize:18,theme:'light'})`)
   await reload()
@@ -117,7 +130,7 @@ app.whenReady().then(async () => {
 
   const moved = await st()
   const { cur, total } = await pagesNow()
-  check('ページ送りできる', moved.tf !== 'none' && moved.tf !== 'translateY(0px)', moved.pages)
+  check('ページ送りが左右移動になる', /^translateX\([^0]/.test(moved.tf), `${moved.tf} / ${moved.pages}`)
   check('検証位置が章の途中である(両端ではない)', cur > 1 && cur < total, `${cur} / ${total}`)
   const p1 = await savedPos()
   check('読書位置がTextPositionで保存される', !!p1 && typeof p1.offset === 'number', JSON.stringify(p1))
@@ -143,6 +156,18 @@ app.whenReady().then(async () => {
     check(label, !!same, `${JSON.stringify(before)} -> ${JSON.stringify(after)}`)
   }
 
+  const beforeResize = await savedPos()
+  win.setSize(700, 520)
+  await sleep(1400)
+  const afterResize = await savedPos()
+  const resizedViewport = await js(`(()=>{const v=document.querySelector('.viewport');return [v.clientWidth,v.clientHeight]})()`)
+  const resizeSame = beforeResize && afterResize && beforeResize.blockId === afterResize.blockId
+    && Math.abs(beforeResize.offset - afterResize.offset) <= 2
+  check('小さい画面へのリサイズ後も同じ位置', !!resizeSame, `${resizedViewport.join('×')} / ${JSON.stringify(beforeResize)} -> ${JSON.stringify(afterResize)}`)
+  check('小さい画面でも本文領域が残る', resizedViewport[0] > 300 && resizedViewport[1] > 240, resizedViewport.join('×'))
+  win.setSize(1180, 820)
+  await sleep(900)
+
   console.log('\n== 表示モード ==')
   await js(`window.aozora.saveSettings({readingMode:'scroll'})`)
   await reload()
@@ -151,10 +176,21 @@ app.whenReady().then(async () => {
     const r=await window.aozora.openBook(${JSON.stringify(target.id)});const p=r.progress.position;
     const blk=document.querySelector('[data-block-id="'+p.blockId+'"]');
     if(!blk) return {visible:false,reason:'not rendered'};
-    const el=blk.querySelector('[data-run]')||blk;
+    const runs=[...blk.querySelectorAll('[data-run]')];
+    const run=[...runs].reverse().find(x=>Number(x.dataset.s)<=p.offset);
+    if(!run) return {visible:false,reason:'run not found'};
+    let remaining=p.offset-Number(run.dataset.s), point=null;
+    const walker=document.createTreeWalker(run,NodeFilter.SHOW_TEXT,{acceptNode(n){
+      return n.parentElement?.closest('rt')?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT}});
+    while(walker.nextNode()) { const n=walker.currentNode;
+      if(remaining<=n.data.length){point=[n,remaining];break} remaining-=n.data.length; }
+    if(!point) return {visible:false,reason:'point not found'};
+    const range=document.createRange();range.setStart(point[0],Math.min(point[1],point[0].data.length-1));
+    range.setEnd(point[0],Math.min(point[1]+1,point[0].data.length));
     const vp=document.querySelector('.viewport');
-    const v=vp.getBoundingClientRect(), b=el.getBoundingClientRect();
+    const v=vp.getBoundingClientRect(), b=range.getBoundingClientRect();
     return {visible: b.bottom>v.top&&b.top<v.bottom&&b.right>v.left&&b.left<v.right,
+            rect:[Math.round(b.left),Math.round(b.right),Math.round(v.left),Math.round(v.right)],
             scroll:[Math.round(vp.scrollLeft),Math.round(vp.scrollTop)]}})()`)
   check('スクロール表示で保存位置が見えている', vis.visible, JSON.stringify(vis.scroll))
 
@@ -176,8 +212,25 @@ app.whenReady().then(async () => {
   const srNone = await js(`window.aozora.searchBook(${JSON.stringify(target.id)},'該当しない語句zzz')`)
   check('該当なしを正しく返す', srNone.count === 0)
 
+  await js(`(()=>{[...document.querySelectorAll('.toolbar button')].find(x=>x.textContent==='検索')?.click()})()`)
+  await sleep(250)
+  const searchPlacement = await js(`(()=>{const t=document.querySelector('.toolbar').getBoundingClientRect();
+    const s=document.querySelector('.toolbar-search').getBoundingClientRect();return {inside:s.top>=t.top&&s.bottom<=t.bottom+1}})()`)
+  check('検索入力がツールバー内に収まる', searchPlacement.inside)
+  await js(`(()=>{const i=document.querySelector('.toolbar-search input');i.focus();i.select()})()`)
+  await win.webContents.insertText('先生')
+  await sleep(700)
+  const resultPlacement = await js(`(()=>{const t=document.querySelector('.toolbar').getBoundingClientRect();
+    const p=document.querySelector('.search-popover')?.getBoundingClientRect();return !!p&&p.top>=t.bottom})()`)
+  check('検索結果がツールバーの下に開く', resultPlacement)
+  await js(`document.querySelector('.toolbar-search button:last-child').click()`)
+  await sleep(200)
+
   const themes = {}
   await js(`document.querySelector('.toolbar button:last-child').click()`); await sleep(400)
+  const settingsPlacement = await js(`(()=>{const t=document.querySelector('.toolbar').getBoundingClientRect();
+    const p=document.querySelector('.settings-overlay').getBoundingClientRect();return p.top>=t.bottom})()`)
+  check('設定パネルがツールバーの下に開く', settingsPlacement)
   for (const name of ['ダーク', 'セピア', 'ライト']) {
     await js(`(()=>{[...document.querySelectorAll('.settings-overlay button')].find(x=>x.textContent==='${name}')?.click()})()`)
     await sleep(400)

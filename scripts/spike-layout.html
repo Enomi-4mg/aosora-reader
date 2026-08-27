@@ -71,6 +71,34 @@ window.__runSpike = () => {
     }
   } catch (e) { hl = 'error: ' + e.message }
   out.cssCustomHighlight = hl
+
+  // 横方向へ送る縦書きページング候補。multicolumn を使わず、縦書き本来の
+  // block progression（右→左）に本文を伸ばした場合の幾何を記録する。
+  {
+    const vp = document.createElement('div')
+    vp.className = 'viewport v'
+    vp.style.width = W + 'px'
+    vp.style.height = H + 'px'
+    const c = document.createElement('div')
+    c.className = 'content'
+    c.style.height = '100%'
+    c.style.minWidth = '100%'
+    c.style.width = 'max-content'
+    c.style.columnCount = '1'
+    c.innerHTML = '<p>' + SAMPLE.repeat(3) + '</p>'
+    vp.appendChild(c)
+    document.getElementById('stage').appendChild(vp)
+    const vr = vp.getBoundingClientRect()
+    const cr = c.getBoundingClientRect()
+    const p = c.querySelector('p').getBoundingClientRect()
+    out['vertical-natural'] = {
+      viewport: [vr.left, vr.right, vr.width],
+      content: [cr.left, cr.right, cr.width],
+      paragraph: [p.left, p.right, p.width],
+      extent: [c.scrollWidth, c.scrollHeight]
+    }
+    vp.remove()
+  }
   out.chrome = navigator.userAgent.match(/Chrome\/[\d.]+/)?.[0]
   return out
 }

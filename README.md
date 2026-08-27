@@ -12,7 +12,8 @@ npm install
 npm run dev
 ```
 
-「作品を追加」から青空文庫の `.txt` / `.zip` を選ぶか、本棚にドラッグ&ドロップする。
+「青空文庫から追加」で公式カタログを検索するか、「ファイルから追加」で `.txt` / `.zip`
+を選ぶ。ローカルファイルは本棚へのドラッグ&ドロップでも取り込める。
 
 | コマンド | 内容 |
 |---|---|
@@ -45,18 +46,19 @@ npm run dev
 読了率も読了時間も、ページ数ではなくこの文字オフセットから算出する。
 だからフォントにもウィンドウサイズにも writingMode にも影響されない。
 
-### 不変条件 B — レイアウトは「インライン軸オフセット」1つに還元する
+### 不変条件 B — ページ送りは画面上の左右移動に統一する
 
-CSS multicolumn は**インライン軸方向**にあふれる。
+横書きは CSS multicolumn の列を左から右へ並べ、本文を左へ送る。
+縦書きは writing-mode 本来の block progression で本文を右から左へ伸ばし、
+次ページでは本文を右へ送る。
 
-| writingMode | インライン軸 | ページ送り |
+| writingMode | 本文の進行 | ページ送り |
 |---|---|---|
-| `horizontal-tb` | 水平 | `translateX` |
-| `vertical-rl` | 垂直 | `translateY` |
+| `horizontal-tb` | 左→右 | `translateX(-pageWidth)` |
+| `vertical-rl` | 右→左 | `translateX(+pageWidth)` |
 
-つまり縦横の違いは「その1つの量を X に割り当てるか Y に割り当てるか」でしかない。
-`LayoutController` はこの1軸だけを動かし、`next()` / `previous()` / `goToPosition()`
-という論理操作から先に縦横の分岐を出さない。
+クリック位置・矢印キー・マウスドラッグと本文の移動を、すべてこの左右方向へ揃える。
+`LayoutController` は `next()` / `previous()` / `goToPosition()` という論理操作を提供する。
 
 **ページ番号はどこにも保存しない。** 保存するのは常に `TextPosition` で、
 ページ番号は毎回そのつど幾何から導出し直す。
