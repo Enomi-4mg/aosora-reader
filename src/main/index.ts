@@ -4,7 +4,7 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from 'electron'
 import { join } from 'node:path'
 import { normalizeSettings, type ReaderSettings } from '@shared/model/settings'
-import type { AozoraApi, ImportOutcome, OpenBookResult } from '@shared/ipc'
+import type { AozoraIpcApi, ImportOutcome, OpenBookResult } from '@shared/ipc'
 import { openDatabase, type Db } from './db/connection'
 import { BookRepository } from './repositories/BookRepository'
 import { ProgressRepository } from './repositories/ProgressRepository'
@@ -80,7 +80,7 @@ function toDto(o: ServiceOutcome): ImportOutcome {
   }
 }
 
-const handlers: AozoraApi = {
+const handlers: AozoraIpcApi = {
   async listBooks() {
     return books.listSummaries()
   },

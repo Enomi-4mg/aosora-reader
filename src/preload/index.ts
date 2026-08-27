@@ -1,14 +1,19 @@
 /**
  * contextBridge。renderer には型付きの関数だけを渡し、Node の API は一切出さない。
  */
-import { contextBridge, ipcRenderer } from 'electron'
-import { IPC_CHANNELS, type AozoraApi } from '@shared/ipc'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
+import { IPC_CHANNELS, type AozoraApi, type AozoraIpcApi } from '@shared/ipc'
 
-const api = Object.fromEntries(
+const ipcApi = Object.fromEntries(
   IPC_CHANNELS.map((ch) => [
     ch,
     (...args: unknown[]) => ipcRenderer.invoke(ch, ...args)
   ])
-) as unknown as AozoraApi
+) as unknown as AozoraIpcApi
+
+const api: AozoraApi = {
+  ...ipcApi,
+  getPathForFile: (file) => webUtils.getPathForFile(file)
+}
 
 contextBridge.exposeInMainWorld('aozora', api)

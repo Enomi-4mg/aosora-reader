@@ -4,6 +4,7 @@ import { ReaderView } from '../reader/ReaderView'
 import { useReaderStore } from '../state/useReaderStore'
 import { useSettingsStore } from '../state/useSettingsStore'
 import { useLibraryStore } from '../state/useLibraryStore'
+import { importablePathsFromFiles } from '../library/dropImport'
 
 export function App(): JSX.Element {
   const { settings, loaded, load } = useSettingsStore()
@@ -29,9 +30,10 @@ export function App(): JSX.Element {
     const onDrop = (e: DragEvent): void => {
       prevent(e)
       if (view !== 'library') return
-      const paths = Array.from(e.dataTransfer?.files ?? [])
-        .map((f) => (f as File & { path?: string }).path)
-        .filter((p): p is string => typeof p === 'string' && /\.(txt|zip)$/i.test(p))
+      const paths = importablePathsFromFiles(
+        e.dataTransfer?.files ?? [],
+        window.aozora.getPathForFile
+      )
       if (paths.length > 0) void library.importPaths(paths)
     }
     window.addEventListener('dragover', prevent)

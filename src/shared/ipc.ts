@@ -46,7 +46,7 @@ export interface OpenBookResult {
   progress: ReadingProgressDto | null
 }
 
-export interface AozoraApi {
+export interface AozoraIpcApi {
   listBooks(): Promise<BookSummary[]>
   importDialog(): Promise<ImportOutcome[]>
   importPaths(paths: string[]): Promise<ImportOutcome[]>
@@ -61,7 +61,12 @@ export interface AozoraApi {
   saveSettings(patch: Partial<ReaderSettings>): Promise<ReaderSettings>
 }
 
-/** ipcRenderer.invoke のチャネル名。AozoraApi のキーと一対一。 */
+export interface AozoraApi extends AozoraIpcApi {
+  /** Electron が保持する File の実パスを preload 内で安全に解決する。 */
+  getPathForFile(file: File): string
+}
+
+/** ipcRenderer.invoke のチャネル名。AozoraIpcApi のキーと一対一。 */
 export const IPC_CHANNELS = [
   'listBooks',
   'importDialog',
@@ -73,6 +78,6 @@ export const IPC_CHANNELS = [
   'searchBook',
   'getSettings',
   'saveSettings'
-] as const satisfies ReadonlyArray<keyof AozoraApi>
+] as const satisfies ReadonlyArray<keyof AozoraIpcApi>
 
 export type IpcChannel = (typeof IPC_CHANNELS)[number]
