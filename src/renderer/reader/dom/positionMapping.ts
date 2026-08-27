@@ -36,19 +36,26 @@ export function runTextLength(run: Element): number {
 }
 
 /**
- * run 内のテキストノードを文書順に辿る。<rt> 配下は plainText に含まれないので飛ばす。
+ * root の子孫のテキストノードを文書順に辿る。<rt> 配下は plainText に含まれないので飛ばす。
  * visit が true を返したら打ち切る。
  */
 function walkText(root: Node, visit: (t: Text) => boolean): boolean {
   for (let c = root.firstChild; c !== null; c = c.nextSibling) {
-    if (isExcludedFromText(c)) continue
-    if (c.nodeType === Node.TEXT_NODE) {
-      if (visit(c as Text)) return true
-    } else if (walkText(c, visit)) {
-      return true
-    }
+    if (walkNode(c, visit)) return true
   }
   return false
+}
+
+/**
+ * node 自身とその子孫を辿る。テキストノードを単体で渡せるようにするための入口。
+ *
+ * ここを walkText で代用してはいけない。walkText は firstChild から nextSibling を
+ * 追うので、テキストノードを渡すと**その後ろの兄弟まで**数えてしまう。
+ */
+function walkNode(node: Node, visit: (t: Text) => boolean): boolean {
+  if (isExcludedFromText(node)) return false
+  if (node.nodeType === Node.TEXT_NODE) return visit(node as Text)
+  return walkText(node, visit)
 }
 
 /** run 内のテキストノードを文書順に集める。<rt> は除外する。 */
@@ -137,8 +144,7 @@ export function domPointToPosition(
     // 要素境界を指している場合。offset は子ノードのインデックス。
     const children = Array.from(node.childNodes).slice(0, offset)
     for (const c of children) {
-      if (isExcludedFromText(c)) continue
-      walkText(c.nodeType === Node.TEXT_NODE ? wrap(c) : c, (t) => {
+      walkNode(c, (t) => {
         local += t.data.length
         return false
       })
@@ -146,11 +152,6 @@ export function domPointToPosition(
   }
 
   return { bookId, chapterId, blockId, offset: runStart(run) + local }
-}
-
-/** 単独のテキストノードを walkText に渡すためのラッパ。 */
-function wrap(node: Node): Node {
-  return { firstChild: node, nodeType: Node.ELEMENT_NODE } as unknown as Node
 }
 
 /** run の外を指しているときに、Block 内の妥当なオフセットへ寄せる。 */

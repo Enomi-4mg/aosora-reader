@@ -162,3 +162,23 @@ describe('本文外の点', () => {
     expect(domPointToPosition(BOOK, outside, 0)).toBeNull()
   })
 })
+
+describe('要素境界を指す DOM 点', () => {
+  it('run の子インデックスから先の兄弟まで数えない', () => {
+    const { el } = render('あい|漢《かん》うえ')
+    const run = el.querySelector(SELECTOR_RUN)!
+    // run の子は [テキスト'あい', <ruby>漢</ruby>, テキスト'うえ'] ではなく
+    // run 単位に分かれる場合もあるため、テキスト子を持つ run を選ぶ
+    const target = Array.from(el.querySelectorAll(SELECTOR_RUN)).find(
+      (r) => r.childNodes.length > 1
+    ) ?? run
+    const before = Array.from(target.childNodes)
+      .slice(0, 1)
+      .reduce((n, c) => n + (c.textContent?.length ?? 0), 0)
+    const p = domPointToPosition(BOOK, target, 1)
+    expect(p).not.toBeNull()
+    expect(p!.offset).toBe(
+      Number.parseInt(target.getAttribute('data-s') ?? '0', 10) + before
+    )
+  })
+})
