@@ -18,11 +18,6 @@ export interface ZipContents {
 
 export class ZipError extends Error {}
 
-/** ZIP 内のファイル名は Shift_JIS のことがあるため、表示用に best-effort で戻す。 */
-function decodeEntryName(name: string): string {
-  return name
-}
-
 export function readAozoraZip(bytes: Uint8Array): ZipContents {
   let files: Record<string, Uint8Array>
   try {
@@ -33,9 +28,11 @@ export function readAozoraZip(bytes: Uint8Array): ZipContents {
     )
   }
 
+  // 青空文庫の ZIP はファイル名が Shift_JIS のことがあり、名前は文字化けしうる。
+  // ここで名前を使うのは拡張子の判定だけで、'.txt' は ASCII なので化けても残る。
   const entries = Object.entries(files)
     .filter(([name]) => !name.endsWith('/') && !name.split('/').pop()!.startsWith('.'))
-    .map(([name, b]) => ({ name: decodeEntryName(name), bytes: b }))
+    .map(([name, b]) => ({ name, bytes: b }))
 
   const txts = entries.filter((e) => /\.txt$/i.test(e.name))
   if (txts.length === 0) {
