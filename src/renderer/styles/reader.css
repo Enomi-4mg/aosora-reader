@@ -90,7 +90,6 @@
   inline-size: 100%;
   min-block-size: 100%;
   block-size: max-content;
-  column-count: 1;
 }
 
 /* 横書きは1ページ内の段数を保ち、列ピッチ単位で左へ送る。 */

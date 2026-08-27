@@ -90,11 +90,14 @@ app.whenReady().then(async () => {
   await openTarget()
 
   const st = () => js(`(()=>{const vp=document.querySelector('.viewport'),c=document.querySelector('.content');
+    const v=vp.getBoundingClientRect();
+    const visibleRuns=[...c.querySelectorAll('[data-run]')].filter((run)=>{const r=run.getBoundingClientRect();
+      return r.bottom>v.top&&r.top<v.bottom&&r.right>v.left&&r.left<v.right}).length;
     return {wm:getComputedStyle(vp).writingMode, extent:[c.scrollWidth,c.scrollHeight],
       pages:document.querySelector('.status .muted')?.textContent,
       pct:document.querySelector('.status-progress').textContent,
       tf:c.style.transform||'none', rubies:c.querySelectorAll('ruby').length,
-      runs:c.querySelectorAll('[data-run]').length}})()`)
+      runs:c.querySelectorAll('[data-run]').length,visibleRuns}})()`)
   const savedPos = () => js(`(async()=>{const r=await window.aozora.openBook(${JSON.stringify(target.id)});return r.progress?.position})()`)
 
   let s = await st()
@@ -131,6 +134,7 @@ app.whenReady().then(async () => {
   const moved = await st()
   const { cur, total } = await pagesNow()
   check('ページ送りが左右移動になる', /^translateX\([^0]/.test(moved.tf), `${moved.tf} / ${moved.pages}`)
+  check('ページ送り後も本文が表示される', moved.visibleRuns > 0, `${moved.visibleRuns} runs`)
   check('検証位置が章の途中である(両端ではない)', cur > 1 && cur < total, `${cur} / ${total}`)
   const p1 = await savedPos()
   check('読書位置がTextPositionで保存される', !!p1 && typeof p1.offset === 'number', JSON.stringify(p1))
