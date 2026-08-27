@@ -30,12 +30,15 @@ export interface LayoutContext {
 }
 
 const COLUMN_GAP_RATIO = 2.2 // fontSize に対する段間の比
+const EDGE_EPSILON = 1
 
 export class LayoutController {
   private pageCount = 1
   private currentPage = 0
   private step = 1
   private gap = 40
+  /** 縦書き本文の字形が占める、右端からの論理座標区間。 */
+  private verticalInk: Array<[start: number, end: number]> = []
 
   constructor(private ctx: LayoutContext) {}
 
@@ -69,6 +72,8 @@ export class LayoutController {
     const pageWidth = this.pageWidth()
 
     if (!this.paginated) {
+      this.verticalInk = []
+      this.clearEdgeMasks()
       this.pageCount = 1
       this.currentPage = 0
       this.step = pageWidth
@@ -88,6 +93,8 @@ export class LayoutController {
       Math.ceil((extent + (this.vertical ? 0 : this.gap)) / this.step)
     )
     this.currentPage = Math.min(this.currentPage, this.pageCount - 1)
+    this.verticalInk = this.vertical ? this.measureVerticalInk() : []
+    if (!this.vertical) this.clearEdgeMasks()
     this.applyTransform(false)
     return this.metrics()
   }
@@ -106,11 +113,100 @@ export class LayoutController {
   private applyTransform(animate: boolean): void {
     const { content, settings } = this.ctx
     const d = this.currentPage * this.step * (this.vertical ? 1 : -1)
+    if (this.vertical) this.applyEdgeMasks()
     content.style.transition =
       animate && settings.pageTransitionMs > 0
         ? `transform ${settings.pageTransitionMs}ms ease`
         : 'none'
     content.style.transform = `translateX(${d}px)`
+  }
+
+  /**
+   * 各文字の描画矩形を、縦書き本文の右端からの距離へ変換して統合する。
+   * 要素全体の矩形では長い run が複数列を一つに包んでしまうため、
+   * Text node ごとの ClientRect（実際の一列）を使う。
+   */
+  private measureVerticalInk(): Array<[number, number]> {
+    const { content } = this.ctx
+    const contentRect = content.getBoundingClientRect()
+    const intervals: Array<[number, number]> = []
+    const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT)
+
+    while (walker.nextNode()) {
+      const node = walker.currentNode as Text
+      if (node.data.length === 0) continue
+      const range = document.createRange()
+      range.selectNodeContents(node)
+      for (const rect of range.getClientRects()) {
+        if (rect.width <= 0 || rect.height <= 0) continue
+        intervals.push([
+          contentRect.right - rect.right,
+          contentRect.right - rect.left
+        ])
+      }
+    }
+
+    intervals.sort((a, b) => a[0] - b[0])
+    const merged: Array<[number, number]> = []
+    for (const interval of intervals) {
+      const last = merged[merged.length - 1]
+      if (last && interval[0] <= last[1] + EDGE_EPSILON) {
+        last[1] = Math.max(last[1], interval[1])
+      } else {
+        merged.push([...interval])
+      }
+    }
+    return merged
+  }
+
+  /** ページ境界を横切る字形区間。区間外なら境界は行間にある。 */
+  private inkAt(coord: number): [number, number] | null {
+    let lo = 0
+    let hi = this.verticalInk.length - 1
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1
+      const interval = this.verticalInk[mid]!
+      if (coord < interval[0]) hi = mid - 1
+      else if (coord > interval[1]) lo = mid + 1
+      else return interval
+    }
+    return null
+  }
+
+  /**
+   * ページ間の余白は重なっているため、境界をまたぐ一列は前ページへ割り当てる。
+   * 左側ではその列を全部見せ、次ページの右側では全部覆うことで、
+   * 文字の欠落・重複なしに「半文字だけ見える」状態を防ぐ。
+   */
+  private applyEdgeMasks(): void {
+    const { viewport } = this.ctx
+    const host = viewport.parentElement ?? viewport
+    const style = getComputedStyle(viewport)
+    const leftPadding = Number.parseFloat(style.paddingLeft)
+    const rightPadding = Number.parseFloat(style.paddingRight)
+    const pageStart = this.currentPage * this.step
+    const pageEnd = pageStart + this.step
+
+    const atEnd = this.inkAt(pageEnd)
+    const leftMask = atEnd
+      ? Math.max(0, leftPadding - (atEnd[1] - pageEnd) - EDGE_EPSILON)
+      : leftPadding
+
+    const atStart = pageStart > 0 ? this.inkAt(pageStart) : null
+    const rightMask = atStart
+      ? rightPadding + (atStart[1] - pageStart) + EDGE_EPSILON
+      : rightPadding
+
+    // viewport の style 属性は React の style prop が管理しているため、
+    // 再描画で消されない親要素に置き、継承させる。
+    host.style.setProperty('--edge-mask-left', `${leftMask}px`)
+    host.style.setProperty('--edge-mask-right', `${rightMask}px`)
+  }
+
+  private clearEdgeMasks(): void {
+    const host = this.ctx.viewport.parentElement ?? this.ctx.viewport
+    host.style.removeProperty('--edge-mask-left')
+    host.style.removeProperty('--edge-mask-right')
   }
 
   /** 論理的な「次へ」。縦書きでも横書きでも意味は同じ。 */

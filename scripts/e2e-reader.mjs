@@ -93,17 +93,25 @@ app.whenReady().then(async () => {
     const v=vp.getBoundingClientRect();
     const visibleRuns=[...c.querySelectorAll('[data-run]')].filter((run)=>{const r=run.getBoundingClientRect();
       return r.bottom>v.top&&r.top<v.bottom&&r.right>v.left&&r.left<v.right}).length;
+    const style=getComputedStyle(vp);
+    const leftEdge=v.left+Number.parseFloat(style.getPropertyValue('--edge-mask-left'));
+    const rightEdge=v.right-Number.parseFloat(style.getPropertyValue('--edge-mask-right'));
+    let cutColumns=0;
+    for(const run of c.querySelectorAll('[data-run]')){const range=document.createRange();
+      range.selectNodeContents(run);for(const r of range.getClientRects()){
+        if((r.left<leftEdge&&r.right>leftEdge)||(r.left<rightEdge&&r.right>rightEdge))cutColumns++}}
     return {wm:getComputedStyle(vp).writingMode, extent:[c.scrollWidth,c.scrollHeight],
       pages:document.querySelector('.status .muted')?.textContent,
       pct:document.querySelector('.status-progress').textContent,
       tf:c.style.transform||'none', rubies:c.querySelectorAll('ruby').length,
-      runs:c.querySelectorAll('[data-run]').length,visibleRuns}})()`)
+      runs:c.querySelectorAll('[data-run]').length,visibleRuns,cutColumns}})()`)
   const savedPos = () => js(`(async()=>{const r=await window.aozora.openBook(${JSON.stringify(target.id)});return r.progress?.position})()`)
 
   let s = await st()
   check('縦書きで表示される', s.wm === 'vertical-rl')
   check('ルビが描画される', s.rubies > 0, `${s.rubies}個`)
   check('本文が run に分割される', s.runs > 0, `${s.runs}個`)
+  check('ページ端で文字が見切れない', s.cutColumns === 0, `${s.cutColumns} columns`)
 
   console.log('\n== ページ送りと位置 ==')
   const pagesNow = async () => {
@@ -135,6 +143,7 @@ app.whenReady().then(async () => {
   const { cur, total } = await pagesNow()
   check('ページ送りが左右移動になる', /^translateX\([^0]/.test(moved.tf), `${moved.tf} / ${moved.pages}`)
   check('ページ送り後も本文が表示される', moved.visibleRuns > 0, `${moved.visibleRuns} runs`)
+  check('ページ送り後も文字が見切れない', moved.cutColumns === 0, `${moved.cutColumns} columns`)
   check('検証位置が章の途中である(両端ではない)', cur > 1 && cur < total, `${cur} / ${total}`)
   const p1 = await savedPos()
   check('読書位置がTextPositionで保存される', !!p1 && typeof p1.offset === 'number', JSON.stringify(p1))

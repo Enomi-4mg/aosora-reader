@@ -70,7 +70,8 @@
   position: absolute;
   inset: 0;
   /* 小さい画面では指定余白を短辺の12%までに抑え、本文領域を必ず残す。 */
-  padding: min(var(--page-margin), 12vmin);
+  --page-padding: min(var(--page-margin), 12vmin);
+  padding: var(--page-padding);
   overflow: hidden;
 
   font-family: var(--font-family);
@@ -78,6 +79,35 @@
   font-weight: var(--font-weight);
   line-height: var(--line-height);
   letter-spacing: var(--letter-spacing);
+}
+
+/* ページ境界で一列を安全に受け止められるよう、縦書きページだけ字幅ぶんを残す。 */
+.viewport.mode-pagination.wm-vertical {
+  --page-padding: min(max(var(--page-margin), calc(var(--font-size) * 1.25)), 12vmin);
+}
+
+/*
+ * 自然な block progression を横へ送る縦書きでは、ページ境界が文字列を横切り得る。
+ * LayoutController が実際の字形矩形から決めた安全な位置まで余白色で覆い、
+ * 前後どちらのページにも半端な一列を露出させない。
+ */
+.viewport.mode-pagination.wm-vertical::before,
+.viewport.mode-pagination.wm-vertical::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: var(--bg);
+}
+.viewport.mode-pagination.wm-vertical::before {
+  left: 0;
+  width: var(--edge-mask-left, var(--page-padding));
+}
+.viewport.mode-pagination.wm-vertical::after {
+  right: 0;
+  width: var(--edge-mask-right, var(--page-padding));
 }
 
 .content {
