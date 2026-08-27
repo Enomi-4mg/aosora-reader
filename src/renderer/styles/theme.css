@@ -27,7 +27,9 @@
 :root[data-theme='sepia'] {
   --bg: #f4ecd8;
   --fg: #43382a;
-  --secondary: #7d6b52;
+  /* #7d6b52 は背景 #f4ecd8 に対して 4.35:1 で WCAG AA(4.5:1)にわずかに届かない。
+     色調を保ったまま 4.77:1 まで落とす(要件 §11「十分なコントラスト」)。 */
+  --secondary: #786450;
   --border: #ddd0b4;
   --surface: #faf3e3;
   --surface-hover: #ece0c6;
