@@ -270,16 +270,33 @@ export class LayoutController {
   // --- TextPosition ↔ ページ ---
 
   /**
-   * ある要素がインライン軸上でどこにあるか(content 先頭からの距離)。
+   * ページ送り軸(列送り軸)上の座標。content 先頭からの距離。
    * transform 済みの座標から content の矩形を引くことで、変換前の値が得られる。
+   *
+   * 縦書き: 本文は右→左へ伸びるので右端からの距離。
+   * 横書き: multicolumn の列が左→右へ並ぶので左端からの距離。
    */
-  private inlineCoordOf(el: Element): number {
-    return this.inlineCoordOfRect(el.getBoundingClientRect())
-  }
-
-  private inlineCoordOfRect(r: DOMRect): number {
+  private pageCoordOfRect(r: DOMRect): number {
     const c = this.ctx.content.getBoundingClientRect()
     return this.vertical ? c.right - r.right : r.left - c.left
+  }
+
+  /**
+   * 本文が進む軸(block progression 軸)上の座標。
+   *
+   * **ページ送り軸と同じとは限らない。** vertical-rl は列送りもブロック進行も
+   * 右→左なので一致するが、horizontal-tb の連続スクロールでは本文は上→下へ進む。
+   * ここを取り違えると、横書きスクロールで全ブロックの座標が同値になり、
+   * currentPosition() が常に最後のブロックを返してしまう。
+   */
+  private progressCoordOfRect(r: DOMRect): number {
+    if (this.vertical || this.paginated) return this.pageCoordOfRect(r)
+    const c = this.ctx.content.getBoundingClientRect()
+    return r.top - c.top
+  }
+
+  private progressCoordOf(el: Element): number {
+    return this.progressCoordOfRect(el.getBoundingClientRect())
   }
 
   /**
@@ -292,7 +309,7 @@ export class LayoutController {
   private pageOfPoint(node: Node, offset: number): number | null {
     const rect = this.rectOfPoint(node, offset)
     return rect
-      ? Math.max(0, Math.floor(this.inlineCoordOfRect(rect) / this.step))
+      ? Math.max(0, Math.floor(this.pageCoordOfRect(rect) / this.step))
       : null
   }
 
@@ -316,7 +333,7 @@ export class LayoutController {
 
   private pageOfElement(el: Element): number {
     if (!this.paginated) return 0
-    return Math.max(0, Math.floor(this.inlineCoordOf(el) / this.step))
+    return Math.max(0, Math.floor(this.pageCoordOfRect(el.getBoundingClientRect()) / this.step))
   }
 
   /**
@@ -365,7 +382,7 @@ export class LayoutController {
 
     const targetCoord = this.paginated
       ? this.currentPage * this.step
-      : this.visibleInlineStart()
+      : this.visibleProgressStart()
 
     // Block のインライン座標は文書順に単調増加するので二分探索できる
     let lo = 0
@@ -373,7 +390,7 @@ export class LayoutController {
     let found = 0
     while (lo <= hi) {
       const mid = (lo + hi) >> 1
-      if (this.inlineCoordOf(blocks[mid]!) <= targetCoord + 0.5) {
+      if (this.progressCoordOf(blocks[mid]!) <= targetCoord + 0.5) {
         found = mid
         lo = mid + 1
       } else {
@@ -400,7 +417,7 @@ export class LayoutController {
     const runs = Array.from(block.querySelectorAll(SELECTOR_RUN))
     let boundaryRun: Element | null = null
     for (const run of runs) {
-      if (this.inlineCoordOf(run) <= targetCoord + 0.5) boundaryRun = run
+      if (this.progressCoordOf(run) <= targetCoord + 0.5) boundaryRun = run
       else break
     }
     if (!boundaryRun) {
@@ -421,18 +438,17 @@ export class LayoutController {
     }
   }
 
-  /** run 内で、インライン座標が targetCoord 以上になる最小のオフセット。 */
+  /** run 内で、本文進行軸の座標が targetCoord 以上になる最小のオフセット。 */
   private offsetAtBoundary(run: Element, targetCoord: number): number {
     const len = runTextLength(run)
     if (len <= 1) return 0
-    const c = this.ctx.content.getBoundingClientRect()
 
     const coordAt = (off: number): number | null => {
       const r = rangeAtRunOffset(run, off)
       if (!r) return null
       const rect = r.getBoundingClientRect()
       if (rect.width === 0 && rect.height === 0) return null
-      return this.vertical ? c.right - rect.right : rect.left - c.left
+      return this.progressCoordOfRect(rect)
     }
 
     let lo = 0
@@ -452,7 +468,8 @@ export class LayoutController {
     return best
   }
 
-  private visibleInlineStart(): number {
+  /** 連続スクロールで、いま画面上端(縦書きなら右端)に来ている本文進行軸の座標。 */
+  private visibleProgressStart(): number {
     const vp = this.ctx.viewport
     const v = vp.getBoundingClientRect()
     const c = this.ctx.content.getBoundingClientRect()
