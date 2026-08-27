@@ -92,6 +92,7 @@ blockId が変わって既存のハイライトが orphan 化するのを防ぐ�
 npm test                                        # ユニットテスト 101件
 npx vite-node scripts/probe-samples.mjs <dir>   # 実ファイルのパース検査
 npm run build && npx electron scripts/e2e-reader.mjs <dir>   # 実機での §17 検証 22件
+npm run build && npx electron scripts/check-legibility.mjs   # 表示の視認性検証 11件
 ```
 
 `<dir>` には手元の青空文庫ファイル（.zip / .txt）を置いたディレクトリを指定する。
@@ -102,6 +103,20 @@ npm run build && npx electron scripts/e2e-reader.mjs <dir>   # 実機での §17
 
 `scripts/spike-layout.mjs` は不変条件 B を実測したスパイク。
 Electron を上げ直したときに縦書き multicolumn の挙動が変わっていないか確認できる。
+
+### 視認性の検証
+
+`check-legibility.mjs` は `scripts/typography-specimen.txt`（ルビ・傍点各種・傍線各種・
+太字・字下げ・外字・縦中横を網羅した組版見本）を取り込んで、次を数値で判定する。
+
+- ルビの実効サイズ（8px 未満は判読困難）
+- ルビが隣接行に接触しないか
+- テーマごとのコントラスト比（WCAG AA 4.5:1 / 要件 §11）
+- 一行あたりの文字数
+
+**目視の印象は当てにならない。** 実際、最初にスクリーンショットを見たときは
+「行が長すぎる」「ルビで行送りが不揃い」と感じたが、計測するとどちらも誤りだった
+（一行 34 字、列ピッチ 27〜27px で均一）。判定は数値で行うこと。
 
 ## 外字変換表の再生成
 
