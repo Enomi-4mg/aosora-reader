@@ -394,8 +394,22 @@ rt {
   transform: translate(-50%, -5px) rotate(45deg);
 }
 .selection-menu button { padding: 5px 8px; font-size: 11px; }
-.selection-menu form { display: flex; align-items: flex-end; gap: 4px; }
-.selection-menu textarea { inline-size: 220px; min-block-size: 54px; resize: none; }
+
+/* メモ入力。選択範囲へのメモと現在位置へのメモで同じ見た目を使う。 */
+.memo-form { display: flex; align-items: flex-end; gap: 4px; }
+.memo-form textarea { inline-size: 220px; min-block-size: 54px; resize: none; }
+.memo-form button { padding: 5px 8px; font-size: 11px; }
+
+/* 現在位置へのメモ。右クリック位置に出す。 */
+.position-memo {
+  position: fixed;
+  z-index: 80;
+  padding: 5px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+}
 .highlight-swatches { display: flex; gap: 3px; padding-inline: 3px; }
 .highlight-swatches .swatch {
   inline-size: 18px;

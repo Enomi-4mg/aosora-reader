@@ -20,6 +20,7 @@ import { domPointToPosition, selectionToTextRange, textRangeToDomRange } from '.
 import { paintHighlights, paintSavedHighlights, paintTtsHighlight } from './dom/highlightPainter'
 import { chapterEndPosition, chapterStartPosition, extractRangeText, normalizeRange } from '@shared/model/position'
 import { SelectionMenu, type SelectionState } from './SelectionMenu'
+import { MemoForm } from './MemoForm'
 import { useReadingSession } from './hooks/useReadingSession'
 import { useTtsController } from './hooks/useTtsController'
 import { TtsControls } from './TtsControls'
@@ -57,6 +58,8 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
   const [fullscreen, setFullscreen] = useState(false)
   const [focusAwake, setFocusAwake] = useState(false)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string; position: TextPosition | null } | null>(null)
+  /** 現在位置へのメモ入力。window.prompt は Electron で使えないので自前の UI で受ける。 */
+  const [positionMemo, setPositionMemo] = useState<{ x: number; y: number; position: TextPosition } | null>(null)
   const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -321,15 +324,16 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
   }, [])
 
   const closeTransient = useCallback((): boolean => {
-    if (selection || dictionaryOpen || authorOpen || contextMenu) {
+    if (selection || dictionaryOpen || authorOpen || contextMenu || positionMemo) {
       clearSelection()
       setDictionaryOpen(false)
       setAuthorOpen(false)
       setContextMenu(null)
+      setPositionMemo(null)
       return true
     }
     return false
-  }, [selection, dictionaryOpen, authorOpen, contextMenu])
+  }, [selection, dictionaryOpen, authorOpen, contextMenu, positionMemo])
 
   useReaderKeyboard({
     next,
@@ -593,10 +597,12 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
           setContextMenu(null)
         }}
         onMemo={() => {
-          const text = window.prompt('現在位置へのメモ')
-          if (text?.trim() && contextMenu.position) {
-            void annotations.saveNote({ position: contextMenu.position, text })
-            store.setSidebarTab('notes')
+          if (contextMenu.position) {
+            setPositionMemo({
+              x: contextMenu.x,
+              y: contextMenu.y,
+              position: contextMenu.position
+            })
           }
           setContextMenu(null)
         }}
@@ -608,6 +614,20 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
         onSettings={() => { store.setSettingsOpen(true); setContextMenu(null) }}
         onClose={() => setContextMenu(null)}
       />}
+      {positionMemo && (
+        <div className="position-memo" role="dialog" aria-label="現在位置へのメモ"
+          style={{ left: positionMemo.x, top: positionMemo.y }}>
+          <MemoForm
+            placeholder="現在位置へのメモ"
+            onSubmit={(text) => {
+              void annotations.saveNote({ position: positionMemo.position, text })
+              store.setSidebarTab('notes')
+              setPositionMemo(null)
+            }}
+            onCancel={() => setPositionMemo(null)}
+          />
+        </div>
+      )}
 
       <footer className="status" role="status">
         <span className="status-chapter">{chapter.title}</span>

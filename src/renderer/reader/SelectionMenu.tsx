@@ -1,6 +1,7 @@
 import { useState, type JSX } from 'react'
 import { HIGHLIGHT_COLORS, type HighlightColor } from '@shared/model/settings'
 import type { TextRange } from '@shared/model/position'
+import { MemoForm } from './MemoForm'
 
 export interface SelectionState {
   range: TextRange
@@ -20,16 +21,11 @@ interface Props {
 
 export function SelectionMenu({ selection, onHighlight, onMemo, onCopy, onDictionary, onClose }: Props): JSX.Element {
   const [memoOpen, setMemoOpen] = useState(false)
-  const [memo, setMemo] = useState('')
   return (
     <div className="selection-menu" role="dialog" aria-label="選択した本文の操作"
       style={{ left: selection.x, top: selection.y }}>
       {memoOpen ? (
-        <form onSubmit={(event) => { event.preventDefault(); if (memo.trim()) onMemo(memo) }}>
-          <textarea value={memo} onChange={(event) => setMemo(event.target.value)}
-            placeholder="この箇所へのメモ" autoFocus />
-          <button>保存</button><button type="button" className="ghost" onClick={() => setMemoOpen(false)}>戻る</button>
-        </form>
+        <MemoForm onSubmit={onMemo} onCancel={() => setMemoOpen(false)} />
       ) : (
         <>
           <div className="highlight-swatches" aria-label="ハイライト色">

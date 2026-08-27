@@ -15,7 +15,8 @@ export function AnnotationsPanel({ onJump }: Props): JSX.Element {
   const reader = useReaderStore()
   const annotations = useAnnotationsStore()
   const [order, setOrder] = useState<'text' | 'created'>('text')
-  const [editing, setEditing] = useState<string | null>(null)
+  // window.prompt は Electron で使えないので、名前の変更もこの場で編集する。
+  const [editing, setEditing] = useState<{ kind: 'note' | 'bookmark'; id: string } | null>(null)
   const [draft, setDraft] = useState('')
   const index = reader.index
 
@@ -78,14 +79,31 @@ export function AnnotationsPanel({ onJump }: Props): JSX.Element {
         <AnnotationList empty="栞はまだありません。⌘B で現在位置に追加できます。">
           {bookmarks.map((item) => (
             <li key={item.id} className="annotation-item bookmark-item">
-              <button className="annotation-jump" onClick={() => onJump(item.position)}>{item.label}</button>
-              <div className="annotation-actions">
-                <button className="ghost" onClick={() => {
-                  const label = window.prompt('栞の名前', item.label)
-                  if (label !== null) void annotations.updateBookmark(item.id, label)
-                }}>名前</button>
-                <button className="ghost" onClick={() => void annotations.deleteBookmark(item.id)}>削除</button>
-              </div>
+              {editing?.kind === 'bookmark' && editing.id === item.id ? (
+                <form onSubmit={(event) => {
+                  event.preventDefault()
+                  void annotations.updateBookmark(item.id, draft)
+                  setEditing(null)
+                }}>
+                  <input value={draft} aria-label="栞の名前" autoFocus
+                    onChange={(event) => setDraft(event.target.value)} />
+                  <div className="annotation-actions">
+                    <button>保存</button>
+                    <button type="button" className="ghost" onClick={() => setEditing(null)}>取消</button>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <button className="annotation-jump" onClick={() => onJump(item.position)}>{item.label}</button>
+                  <div className="annotation-actions">
+                    <button className="ghost" onClick={() => {
+                      setDraft(item.label)
+                      setEditing({ kind: 'bookmark', id: item.id })
+                    }}>名前</button>
+                    <button className="ghost" onClick={() => void annotations.deleteBookmark(item.id)}>削除</button>
+                  </div>
+                </>
+              )}
             </li>
           ))}
         </AnnotationList>
@@ -110,7 +128,7 @@ export function AnnotationsPanel({ onJump }: Props): JSX.Element {
             const position = item.range?.start ?? item.position
             return (
               <li key={item.id} className="annotation-item note-item">
-                {editing === item.id ? (
+                {editing?.kind === 'note' && editing.id === item.id ? (
                   <form onSubmit={(event) => {
                     event.preventDefault()
                     void annotations.saveNote({ id: item.id, text: draft }).then(() => setEditing(null))
@@ -122,7 +140,7 @@ export function AnnotationsPanel({ onJump }: Props): JSX.Element {
                   <>
                     <button className="annotation-jump" disabled={!position} onClick={() => position && onJump(position)}>{item.text}</button>
                     <div className="annotation-actions">
-                      <button className="ghost" onClick={() => { setDraft(item.text); setEditing(item.id) }}>編集</button>
+                      <button className="ghost" onClick={() => { setDraft(item.text); setEditing({ kind: 'note', id: item.id }) }}>編集</button>
                       <button className="ghost" onClick={() => void annotations.deleteNote(item.id)}>削除</button>
                     </div>
                   </>
