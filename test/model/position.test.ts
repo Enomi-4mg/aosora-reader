@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   buildBookIndex,
   charOffsetToPosition,
+  chapterEndPosition,
   chapterOf,
+  chapterStartPosition,
   clampPosition,
   comparePositions,
   contextAround,
@@ -166,5 +168,15 @@ describe('補助', () => {
 
   it('chapterOf は所属章を返す', () => {
     expect(chapterOf(index, at('c1_b0', 0))?.title).toBe('第二章')
+  })
+
+  it('章境界の位置を先頭と末尾に解決する', () => {
+    expect(chapterStartPosition(index, 'c1')).toEqual(at('c1_b0', 0))
+    expect(chapterEndPosition(index, 'c0')).toEqual(at('c0_b1', 5))
+  })
+
+  it('存在しない章の境界は null を返す', () => {
+    expect(chapterStartPosition(index, 'missing')).toBeNull()
+    expect(chapterEndPosition(index, 'missing')).toBeNull()
   })
 })

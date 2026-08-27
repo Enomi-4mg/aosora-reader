@@ -16,6 +16,7 @@ import { SearchPanel } from '../panels/SearchPanel'
 import { SettingsPanel } from '../settings/SettingsPanel'
 import { textRangeToDomRange } from './dom/positionMapping'
 import { paintHighlights } from './dom/highlightPainter'
+import { chapterEndPosition, chapterStartPosition } from '@shared/model/position'
 
 interface Props {
   onBackToLibrary: () => void
@@ -133,26 +134,41 @@ export function ReaderView({ onBackToLibrary }: Props): JSX.Element {
     if (!l) return
     if (!l.next()) {
       // 章末なら次章へ(要件 §4.6)
-      if (store.book && store.chapterIndex < store.book.chapters.length - 1) {
-        pendingRestore.current = null
-        store.setChapter(store.chapterIndex + 1)
+      if (
+        store.book &&
+        store.index &&
+        store.chapterIndex < store.book.chapters.length - 1
+      ) {
+        const nextChapterIndex = store.chapterIndex + 1
+        const nextChapter = store.book.chapters[nextChapterIndex]!
+        const target = chapterStartPosition(store.index, nextChapter.id)
+        pendingRestore.current = target
+        store.setChapter(nextChapterIndex)
+        if (target) store.setPosition(target)
       }
       return
     }
     setMetrics(l.metrics())
     syncPosition()
-  }, [store.book, store.chapterIndex])
+  }, [store.book, store.index, store.chapterIndex])
 
   const previous = useCallback(() => {
     const l = layoutRef.current
     if (!l) return
     if (!l.previous()) {
-      if (store.chapterIndex > 0) store.setChapter(store.chapterIndex - 1)
+      if (store.book && store.index && store.chapterIndex > 0) {
+        const previousChapterIndex = store.chapterIndex - 1
+        const previousChapter = store.book.chapters[previousChapterIndex]!
+        const target = chapterEndPosition(store.index, previousChapter.id)
+        pendingRestore.current = target
+        store.setChapter(previousChapterIndex)
+        if (target) store.setPosition(target)
+      }
       return
     }
     setMetrics(l.metrics())
     syncPosition()
-  }, [store.chapterIndex])
+  }, [store.book, store.index, store.chapterIndex])
 
   const syncPosition = useCallback(() => {
     if (restoring.current) return

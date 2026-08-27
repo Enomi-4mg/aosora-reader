@@ -90,6 +90,35 @@ export function startPosition(index: BookIndex): TextPosition | null {
   return makePosition(index.bookId, first.chapter.id, first.block.id, 0)
 }
 
+/** 指定章の先頭位置。章をまたぐページ送りの復元先に使う。 */
+export function chapterStartPosition(
+  index: BookIndex,
+  chapterId: string
+): TextPosition | null {
+  const first = index.blocks.find((e) => e.chapter.id === chapterId)
+  if (!first) return null
+  return makePosition(index.bookId, chapterId, first.block.id, 0)
+}
+
+/** 指定章の末尾位置。前章へ戻るとき、その章の最終ページへ移すために使う。 */
+export function chapterEndPosition(
+  index: BookIndex,
+  chapterId: string
+): TextPosition | null {
+  for (let i = index.blocks.length - 1; i >= 0; i--) {
+    const entry = index.blocks[i]!
+    if (entry.chapter.id === chapterId) {
+      return makePosition(
+        index.bookId,
+        chapterId,
+        entry.block.id,
+        entry.block.plainText.length
+      )
+    }
+  }
+  return null
+}
+
 /**
  * 位置を比較する。a < b なら負、a === b なら 0、a > b なら正。
  * blockId が索引に無い場合は「不明な位置」として末尾側に寄せる。
