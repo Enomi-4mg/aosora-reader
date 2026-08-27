@@ -139,6 +139,11 @@ app.whenReady().then(async () => {
   for (const [label, patch] of [
     ['文字サイズ変更後も同じ位置', { fontSize: 26 }],
     ['行間変更後も同じ位置', { lineHeight: 2.4 }],
+    ['書体変更後も同じ位置', { fontFamily: '"Hiragino Sans", "Yu Gothic", sans-serif' }],
+    ['文字の太さ変更後も同じ位置', { fontWeight: 600 }],
+    ['字間変更後も同じ位置', { letterSpacing: 0.16 }],
+    ['余白変更後も同じ位置', { pageMargin: 96 }],
+    ['段落間隔変更後も同じ位置', { paragraphSpacing: 0.8 }],
     ['横書き切替後も同じ位置', { writingMode: 'horizontal' }],
     ['2段組でも同じ位置', { columns: 2 }],
     ['縦書きに戻しても同じ位置', { writingMode: 'vertical', columns: 1 }]
