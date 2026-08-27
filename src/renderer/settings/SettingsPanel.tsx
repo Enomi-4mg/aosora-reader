@@ -101,6 +101,14 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): JSX.Element
           </select>
         </label>
         <Range
+          label="文字の太さ"
+          value={settings.fontWeight}
+          min={300}
+          max={700}
+          step={100}
+          onChange={(v) => set('fontWeight', v)}
+        />
+        <Range
           label="文字サイズ"
           value={settings.fontSize}
           min={FONT_SIZE_MIN}
@@ -135,16 +143,26 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): JSX.Element
           suffix="px"
           onChange={(v) => set('pageMargin', v)}
         />
+        <Range
+          label="段落間隔"
+          value={settings.paragraphSpacing}
+          min={0}
+          max={2}
+          step={0.1}
+          suffix="em"
+          onChange={(v) => set('paragraphSpacing', v)}
+        />
       </section>
 
       <section>
         <h3>テーマ</h3>
-        <div className="theme-row" role="group" aria-label="テーマ">
+        <div className="theme-tabs" role="tablist" aria-label="テーマ">
           {THEMES.map(([v, label]) => (
             <button
               key={v}
+              role="tab"
               className={settings.theme === v ? 'on' : ''}
-              aria-pressed={settings.theme === v}
+              aria-selected={settings.theme === v}
               onClick={() => set('theme', v)}
             >
               {label}

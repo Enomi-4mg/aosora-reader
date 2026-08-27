@@ -70,14 +70,22 @@ export function useReaderKeyboard({ next, previous, onBackToLibrary }: Args): vo
       if (isTyping(e.target)) return
 
       switch (e.key) {
-        // 縦書き・横書きのどちらでも「次へ / 前へ」という論理操作に写す(要件 §4.6)
         case 'ArrowRight':
+          e.preventDefault()
+          // 縦書きは右から左へ読むため、右矢印は前、左矢印は次。
+          if (settings.settings.writingMode === 'vertical') previous()
+          else next()
+          break
+        case 'ArrowLeft':
+          e.preventDefault()
+          if (settings.settings.writingMode === 'vertical') next()
+          else previous()
+          break
         case 'ArrowDown':
         case 'PageDown':
           e.preventDefault()
           next()
           break
-        case 'ArrowLeft':
         case 'ArrowUp':
         case 'PageUp':
           e.preventDefault()

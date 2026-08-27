@@ -137,10 +137,10 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
 
   toggleSidebar: () => set({ sidebarOpen: !get().sidebarOpen }),
   setSidebarTab: (sidebarTab) => set({ sidebarTab, sidebarOpen: true }),
-  setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+  setSettingsOpen: (settingsOpen) => set({ settingsOpen, searchOpen: settingsOpen ? false : get().searchOpen }),
   setFocusMode: (focusMode) => set({ focusMode }),
 
-  openSearch: () => set({ searchOpen: true }),
+  openSearch: () => set({ searchOpen: true, settingsOpen: false }),
   closeSearch: () => set({ searchOpen: false }),
 
   async runSearch(q) {

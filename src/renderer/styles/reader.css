@@ -1,10 +1,8 @@
 /*
  * Reader のレイアウト。
  *
- * 【不変条件 B】インライン軸サイズを viewport に固定すると、CSS multicolumn は
- * インライン軸方向にあふれる。縦書き(vertical-rl)ならインライン軸は Y、
- * 横書き(horizontal-tb)なら X。LayoutController はその1軸だけを動かす。
- * (M0 スパイクで Chromium 152 上で実測済み)
+ * ページ送りは縦横とも画面上の左右移動に統一する。
+ * 横書きは multicolumn、縦書きは writing-mode 本来の右→左の進行を使う。
  */
 
 .reader {
@@ -14,6 +12,8 @@
 }
 
 .toolbar {
+  position: relative;
+  z-index: 10;
   display: flex;
   gap: 8px;
   align-items: center;
@@ -45,6 +45,7 @@
 }
 
 .reader-stage { position: relative; flex: 1; min-inline-size: 0; }
+.reader-stage.dragging { cursor: grabbing; user-select: none; }
 
 /* 集中モード(要件 §5.12) */
 .reader.focus .toolbar,
@@ -61,13 +62,15 @@
   border-block-start: 1px solid var(--border);
 }
 .status-progress { margin-inline-start: auto; }
+.status-chapter { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- 本文ビューポート ---------- */
 
 .viewport {
   position: absolute;
   inset: 0;
-  padding: var(--page-margin);
+  /* 小さい画面では指定余白を短辺の12%までに抑え、本文領域を必ず残す。 */
+  padding: min(var(--page-margin), 12vmin);
   overflow: hidden;
 
   font-family: var(--font-family);
@@ -78,24 +81,26 @@
 }
 
 .content {
-  column-count: var(--column-count);
-  column-gap: calc(var(--font-size) * 2.2);
-  column-fill: auto;
   will-change: transform;
 }
 
-/* 縦書き: インライン軸 = Y。高さを viewport に固定すると列は下方向へあふれる。 */
+/* 縦書きは本文を右端に固定し、自然な block progression で左へ伸ばす。 */
 .viewport.wm-vertical { writing-mode: vertical-rl; text-orientation: mixed; }
 .viewport.wm-vertical .content {
-  block-size: 100%;
   inline-size: 100%;
+  min-block-size: 100%;
+  block-size: max-content;
+  column-count: 1;
 }
 
-/* 横書き: インライン軸 = X。 */
+/* 横書きは1ページ内の段数を保ち、列ピッチ単位で左へ送る。 */
 .viewport.wm-horizontal { writing-mode: horizontal-tb; }
 .viewport.wm-horizontal .content {
   block-size: 100%;
   inline-size: 100%;
+  column-count: var(--column-count);
+  column-gap: calc(var(--font-size) * 2.2);
+  column-fill: auto;
 }
 
 /*
@@ -113,6 +118,7 @@
   transition: none !important;
   block-size: auto;
   inline-size: 100%;
+  min-block-size: 100%;
 }
 
 /* ページ送り用のクリック領域。縦書きでは論理方向に合わせて左右が入れ替わる。 */
@@ -126,6 +132,7 @@
   border-radius: 0;
   cursor: pointer;
   z-index: 2;
+  touch-action: pan-y;
 }
 .page-zone:hover { background: var(--surface-hover); opacity: 0.35; }
 /*
@@ -138,6 +145,26 @@
 .reader-stage:has(.wm-vertical) > .page-zone.next { inset-inline-start: 0; }
 .reader-stage:has(.wm-vertical) > .page-zone.prev { inset-inline-end: 0; }
 .reader-stage:has(.mode-scroll) > .page-zone { display: none; }
+
+/* 本文の先頭にも作品情報を置く。Document Model の位置座標は消費しない。 */
+.book-frontmatter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75em;
+  min-block-size: min(68%, 24em);
+  margin-block-end: 2.5em;
+  padding-block: 1.5em;
+  break-after: column;
+}
+.book-frontmatter h1 {
+  margin: 0;
+  font-size: 1.55em;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+.book-frontmatter p { margin: 0; }
+.book-subtitle { color: var(--secondary); font-size: 0.92em; }
+.book-author, .book-translator { margin-block-start: 1.25em !important; }
 
 /* ---------- 本文の組版 ---------- */
 
@@ -231,13 +258,19 @@ rt {
 .toc-item.lv-3 button { padding-inline-start: 32px; font-size: 12px; }
 .toc-item.current button { background: var(--surface-hover); font-weight: 600; color: var(--accent); }
 
-/* ---------- 検索 ---------- */
+/* ---------- ツールバー検索 ---------- */
 
-.search-overlay {
+.toolbar-search {
+  position: relative;
+  flex: 1;
+  min-inline-size: 260px;
+  max-inline-size: 680px;
+  margin-inline-start: auto;
+}
+.search-popover {
   position: absolute;
-  inset-block-start: 46px;
-  inset-inline-end: 16px;
-  inline-size: min(400px, calc(100vw - 32px));
+  inset-block-start: calc(100% + 9px);
+  inset-inline: 0;
   max-block-size: 70vh;
   display: flex;
   flex-direction: column;
@@ -247,14 +280,14 @@ rt {
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
   z-index: 30;
 }
-.search-head { display: flex; gap: 6px; align-items: center; padding: 10px; }
+.search-head { display: flex; gap: 6px; align-items: center; }
 .search-head input { flex: 1; }
 .search-head .count { font-size: 12px; color: var(--secondary); white-space: nowrap; }
 
 .search-results {
   list-style: none;
   margin: 0;
-  padding: 0 8px 8px;
+  padding: 8px;
   overflow-y: auto;
 }
 .search-results button {
@@ -281,8 +314,8 @@ rt {
 
 .settings-overlay {
   position: absolute;
-  inset-block-start: 46px;
-  inset-inline-end: 16px;
+  inset-block-start: calc(100% + 1px);
+  inset-inline-end: 14px;
   inline-size: min(340px, calc(100vw - 32px));
   max-block-size: 78vh;
   overflow-y: auto;
@@ -317,4 +350,32 @@ rt {
 .range span { inline-size: 70px; flex-shrink: 0; }
 .range input { flex: 1; }
 .range output { inline-size: 56px; text-align: end; color: var(--secondary); font-size: 12px; }
-.theme-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.theme-tabs {
+  display: flex;
+  border-block-end: 1px solid var(--border);
+}
+.theme-tabs button {
+  flex: 1;
+  padding-inline: 4px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  border-block-end: 2px solid transparent;
+  color: var(--secondary);
+}
+.theme-tabs button.on {
+  color: var(--fg);
+  border-block-end-color: var(--accent);
+}
+
+@media (max-width: 760px) {
+  .toolbar { gap: 4px; padding-inline: 8px; }
+  .toolbar-title .muted { display: none; }
+  .toolbar-search { min-inline-size: 0; }
+  .search-head { gap: 3px; }
+  .search-head input { min-inline-size: 90px; }
+  .search-head button { padding-inline: 7px; }
+  .search-popover { position: fixed; inset-inline: 8px; inset-block-start: 69px; }
+  .settings-overlay { inset-inline-end: 8px; }
+  .status { gap: 8px; padding-inline: 10px; }
+}

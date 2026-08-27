@@ -2,12 +2,8 @@
  * ページ幾何とページ送り。Reader の論理操作 next / previous / goToPosition を
  * ここに集約する(要件 §4.6 / §20-6)。
  *
- * 【不変条件 B】CSS multicolumn は「インライン軸」方向にオーバーフローする。
- *   horizontal-tb → インライン軸 = X (左→右)
- *   vertical-rl   → インライン軸 = Y (上→下)
- * よってページ送りは「インライン軸上のオフセットをずらす」という単一の操作に還元でき、
- * 縦横の違いは X に割り当てるか Y に割り当てるかだけになる。
- * (M0 スパイクで Electron 44 / Chromium 152 上で実測済み)
+ * 横書きは multicolumn の列を左→右へ送り、縦書きは本来の block progression
+ * (右→左) に伸びた本文を左右へ送る。どちらも画面上の移動は水平に統一する。
  *
  * ページ番号はここでしか存在しない。永続化するのは常に TextPosition(要件 §20-1)。
  */
@@ -55,10 +51,12 @@ export class LayoutController {
     return this.ctx.settings.readingMode === 'pagination'
   }
 
-  /** viewport のインライン軸方向のサイズ。 */
-  private viewportInline(): number {
-    const r = this.ctx.viewport.getBoundingClientRect()
-    return Math.max(1, Math.round(this.vertical ? r.height : r.width))
+  /** 固定余白を除いた、実際に本文が見える横幅。 */
+  private pageWidth(): number {
+    const vp = this.ctx.viewport
+    const style = getComputedStyle(vp)
+    const padding = Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.paddingRight)
+    return Math.max(1, Math.round(vp.clientWidth - padding))
   }
 
   /**
@@ -68,12 +66,12 @@ export class LayoutController {
   measure(): LayoutMetrics {
     const { content, settings } = this.ctx
     this.gap = Math.round(settings.fontSize * COLUMN_GAP_RATIO)
-    const inline = this.viewportInline()
+    const pageWidth = this.pageWidth()
 
     if (!this.paginated) {
       this.pageCount = 1
       this.currentPage = 0
-      this.step = inline
+      this.step = pageWidth
       // 連続スクロールでは transform を使わない。
       // 古い値をインラインスタイルに残すと、幾何計算が実際の表示とずれる。
       content.style.transition = 'none'
@@ -81,11 +79,14 @@ export class LayoutController {
       return this.metrics()
     }
 
-    this.step = inline + this.gap
-
-    // インライン軸のサイズを viewport に固定すると、列はインライン軸方向へあふれる
-    const extent = this.vertical ? content.scrollHeight : content.scrollWidth
-    this.pageCount = Math.max(1, Math.ceil((extent + this.gap) / this.step))
+    // 縦書きは段間を挟まず右→左へ自然に伸ばす。横書きだけ multicolumn の
+    // gap を含めた列ピッチで送る。
+    this.step = pageWidth + (this.vertical ? 0 : this.gap)
+    const extent = content.scrollWidth
+    this.pageCount = Math.max(
+      1,
+      Math.ceil((extent + (this.vertical ? 0 : this.gap)) / this.step)
+    )
     this.currentPage = Math.min(this.currentPage, this.pageCount - 1)
     this.applyTransform(false)
     return this.metrics()
@@ -104,14 +105,12 @@ export class LayoutController {
    */
   private applyTransform(animate: boolean): void {
     const { content, settings } = this.ctx
-    const d = -this.currentPage * this.step
+    const d = this.currentPage * this.step * (this.vertical ? 1 : -1)
     content.style.transition =
       animate && settings.pageTransitionMs > 0
         ? `transform ${settings.pageTransitionMs}ms ease`
         : 'none'
-    content.style.transform = this.vertical
-      ? `translateY(${d}px)`
-      : `translateX(${d}px)`
+    content.style.transform = `translateX(${d}px)`
   }
 
   /** 論理的な「次へ」。縦書きでも横書きでも意味は同じ。 */
@@ -184,7 +183,7 @@ export class LayoutController {
 
   private inlineCoordOfRect(r: DOMRect): number {
     const c = this.ctx.content.getBoundingClientRect()
-    return this.vertical ? r.top - c.top : r.left - c.left
+    return this.vertical ? c.right - r.right : r.left - c.left
   }
 
   /**
@@ -195,6 +194,14 @@ export class LayoutController {
    * 指してしまい、復帰のたびに1ページ戻る。
    */
   private pageOfPoint(node: Node, offset: number): number | null {
+    const rect = this.rectOfPoint(node, offset)
+    return rect
+      ? Math.max(0, Math.floor(this.inlineCoordOfRect(rect) / this.step))
+      : null
+  }
+
+  /** DOM上の文字1字の矩形。長いrun全体ではなく保存offsetそのものを測る。 */
+  private rectOfPoint(node: Node, offset: number): DOMRect | null {
     if (node.nodeType !== Node.TEXT_NODE) return null
     const t = node as Text
     const at = Math.min(offset, Math.max(0, t.data.length - 1))
@@ -205,7 +212,7 @@ export class LayoutController {
       r.setEnd(t, at + 1)
       const rect = r.getBoundingClientRect()
       if (rect.width === 0 && rect.height === 0) return null
-      return Math.max(0, Math.floor(this.inlineCoordOfRect(rect) / this.step))
+      return rect
     } catch {
       return null
     }
@@ -241,7 +248,7 @@ export class LayoutController {
 
     // スクロールモードは相対移動で寄せる(RTL の符号問題を避ける)
     const vp = this.ctx.viewport
-    const r = el.getBoundingClientRect()
+    const r = this.rectOfPoint(point.node, point.offset) ?? el.getBoundingClientRect()
     const v = vp.getBoundingClientRect()
     vp.scrollBy(
       this.vertical
@@ -329,7 +336,7 @@ export class LayoutController {
       if (!r) return null
       const rect = r.getBoundingClientRect()
       if (rect.width === 0 && rect.height === 0) return null
-      return this.vertical ? rect.top - c.top : rect.left - c.left
+      return this.vertical ? c.right - rect.right : rect.left - c.left
     }
 
     let lo = 0
@@ -353,7 +360,7 @@ export class LayoutController {
     const vp = this.ctx.viewport
     const v = vp.getBoundingClientRect()
     const c = this.ctx.content.getBoundingClientRect()
-    return this.vertical ? v.right - c.right : v.top - c.top
+    return this.vertical ? c.right - v.right : v.top - c.top
   }
 
   /** 描画済み範囲のうち、指定 Range が何ページ目にあるか。検索結果へのジャンプに使う。 */

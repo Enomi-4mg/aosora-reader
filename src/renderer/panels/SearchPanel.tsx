@@ -28,7 +28,7 @@ export function SearchPanel({ onJump }: Props): JSX.Element {
     store.book?.chapters.findIndex((c) => c.id === chapterId) ?? 0
 
   return (
-    <div className="search-overlay" role="dialog" aria-label="本文検索">
+    <div className="toolbar-search" role="search" aria-label="本文検索">
       <div className="search-head">
         <input
           ref={inputRef}
@@ -55,23 +55,29 @@ export function SearchPanel({ onJump }: Props): JSX.Element {
         <button className="ghost" onClick={store.closeSearch} aria-label="検索を閉じる">×</button>
       </div>
 
-      {result && result.count > 0 && (
-        <ul className="search-results">
-          {result.matches.map((m, i) => (
-            <li key={`${m.position.blockId}:${m.position.offset}`}>
-              <button
-                className={i === store.searchCursor ? 'current' : ''}
-                onClick={() => onJump(chapterIndexOf(m.chapterId), m.position)}
-              >
-                <span className="ctx-before">{m.context.slice(0, m.contextOffset)}</span>
-                <mark>{m.context.slice(m.contextOffset, m.contextOffset + result.query.length)}</mark>
-                <span className="ctx-after">
-                  {m.context.slice(m.contextOffset + result.query.length)}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+      {result && (
+        <div className="search-popover">
+          {result.count === 0 ? (
+            <p className="panel-empty">該当する箇所はありません。</p>
+          ) : (
+            <ul className="search-results">
+              {result.matches.map((m, i) => (
+                <li key={`${m.position.blockId}:${m.position.offset}`}>
+                  <button
+                    className={i === store.searchCursor ? 'current' : ''}
+                    onClick={() => onJump(chapterIndexOf(m.chapterId), m.position)}
+                  >
+                    <span className="ctx-before">{m.context.slice(0, m.contextOffset)}</span>
+                    <mark>{m.context.slice(m.contextOffset, m.contextOffset + result.query.length)}</mark>
+                    <span className="ctx-after">
+                      {m.context.slice(m.contextOffset + result.query.length)}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </div>
   )
