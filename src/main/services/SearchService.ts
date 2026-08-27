@@ -56,10 +56,13 @@ export class SearchService {
     }>
 
     const matches: SearchMatch[] = []
-    const needle = q.toLowerCase()
+    // 要件は ASCII の大小文字だけを無視すること。
+    // String#toLowerCase は一部の Unicode 文字で長さが変わるため、検索結果の
+    // UTF-16 オフセットが本文上の位置からずれる。ASCII だけを長さ不変で畳み込む。
+    const needle = foldAsciiCase(q)
 
     for (const row of rows) {
-      const hay = row.plain_text.toLowerCase()
+      const hay = foldAsciiCase(row.plain_text)
       let from = 0
       while (matches.length < MAX_MATCHES) {
         const idx = hay.indexOf(needle, from)
@@ -95,4 +98,10 @@ export class SearchService {
 
 function escapeLike(s: string): string {
   return s.replace(/[\\%_]/g, (c) => `\\${c}`)
+}
+
+function foldAsciiCase(s: string): string {
+  return s.replace(/[A-Z]/g, (c) =>
+    String.fromCharCode(c.charCodeAt(0) + ('a'.charCodeAt(0) - 'A'.charCodeAt(0)))
+  )
 }

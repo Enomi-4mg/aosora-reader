@@ -52,6 +52,9 @@ interface ReaderState {
   moveSearchCursor: (d: number) => void
 }
 
+/** 入力中に古い検索応答が戻ってきても、最新結果を上書きさせない。 */
+let latestSearchRequest = 0
+
 export const useReaderStore = create<ReaderState>((set, get) => ({
   book: null,
   index: null,
@@ -72,6 +75,7 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
   searchCursor: 0,
 
   async open(bookId) {
+    latestSearchRequest++
     set({ loading: true, error: null })
     try {
       const r = await window.aozora.openBook(bookId)
@@ -103,6 +107,7 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
   },
 
   close() {
+    latestSearchRequest++
     set({
       book: null,
       index: null,
@@ -139,6 +144,7 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
   closeSearch: () => set({ searchOpen: false }),
 
   async runSearch(q) {
+    const request = ++latestSearchRequest
     const { book } = get()
     set({ searchQuery: q })
     if (!book || q.trim() === '') {
@@ -146,6 +152,13 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
       return
     }
     const r = await window.aozora.searchBook(book.id, q)
+    if (
+      request !== latestSearchRequest ||
+      get().book?.id !== book.id ||
+      get().searchQuery !== q
+    ) {
+      return
+    }
     set({ searchResult: r, searchCursor: 0 })
   },
 

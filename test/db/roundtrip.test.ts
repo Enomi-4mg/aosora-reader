@@ -234,6 +234,22 @@ describe('本文検索', () => {
     books.insert(book)
     expect(new SearchService(db).searchBook(book.id, '%').count).toBe(0)
   })
+
+  it('Unicode の大小変換で本文オフセットをずらさない', () => {
+    const book = makeBook()
+    book.id = 'unicode-offset'
+    book.sourceHash = 'unicode-offset'
+    const block = book.chapters[0]!.blocks[0]!
+    block.plainText = 'İA'
+    books.insert(book)
+
+    const result = new SearchService(db).searchBook(book.id, 'a')
+    expect(result.matches).toHaveLength(1)
+    expect(result.matches[0]!.range).toMatchObject({
+      start: { blockId: block.id, offset: 1 },
+      end: { blockId: block.id, offset: 2 }
+    })
+  })
 })
 
 describe('設定', () => {
