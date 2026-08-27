@@ -147,3 +147,12 @@ export const IPC_CHANNELS = [
 ] as const satisfies ReadonlyArray<keyof AozoraIpcApi>
 
 export type IpcChannel = (typeof IPC_CHANNELS)[number]
+
+/**
+ * API を足してチャネル一覧に書き忘れると、ここで型エラーになる。
+ * satisfies だけでは「並んでいるものが有効なキーか」しか見ないため、
+ * 逆向き(すべてのキーが並んでいるか)も押さえておく。
+ * 書き忘れると preload が関数を生やさず、renderer 側で undefined になる。
+ */
+type AssertNever<T extends never> = T
+export type _AllChannelsListed = AssertNever<Exclude<keyof AozoraIpcApi, IpcChannel>>
