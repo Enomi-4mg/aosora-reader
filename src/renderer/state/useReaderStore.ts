@@ -16,7 +16,7 @@ import {
 } from '@shared/model/position'
 import type { SearchResultDto } from '@shared/ipc'
 
-export type SidebarTab = 'contents' | 'bookmarks' | 'highlights' | 'notes'
+export type SidebarTab = 'contents' | 'annotations' | 'bookmarks' | 'highlights' | 'notes'
 
 interface ReaderState {
   book: Book | null

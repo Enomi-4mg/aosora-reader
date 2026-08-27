@@ -3,7 +3,12 @@
 青空文庫の作品をデスクトップで読むための電子書籍リーダー。
 Electron + React + TypeScript / macOS 向け。
 
-現在の到達点: **Phase 1（基本リーダー）完了**。Phase 2（読書支援機能）は未着手。
+現在の到達点: **Phase 1（基本リーダー）+ Phase 2（読書支援機能）完了**。
+
+Phase 2 では、栞・4色ハイライト・範囲/位置メモ・統合注釈一覧・コピー・
+Wiktionary 辞書検索・読了時間推定・読書セッション記録・OS 読み上げ・著者情報・
+fullscreen・集中モードを追加した。注釈と読み上げ位置もページ番号ではなく
+`TextPosition` / `TextRange` で保存・追従する。
 
 ## 使い方
 
@@ -91,7 +96,7 @@ blockId が変わって既存のハイライトが orphan 化するのを防ぐ�
 ## 検証
 
 ```bash
-npm test                                        # ユニットテスト 101件
+npm test                                        # ユニットテスト 113件
 npx vite-node scripts/probe-samples.mjs <dir>   # 実ファイルのパース検査
 npm run build && npx electron scripts/e2e-reader.mjs <dir>   # 実機での §17 検証 22件
 npm run build && npx electron scripts/check-legibility.mjs   # 表示の視認性検証 11件
@@ -130,11 +135,13 @@ curl -O https://x0213.org/codetable/jisx0213-2004-std.txt
 node scripts/build-gaiji-table.mjs jisx0213-2004-std.txt
 ```
 
-## Phase 2 に向けて
+## Phase 2 の実装境界
 
-未実装（要件 §5）: ブックマーク / ハイライト / メモ / 注釈一覧 / 辞書 /
-読了時間推定 / 読書統計 / TTS / 著者情報 / 集中モード。
+- `AnnotationRepository`: 栞・ハイライト・メモの CRUD と orphan 復旧
+- `ReadingSessionRepository`: 開閉位置・経過時間・読書速度の記録
+- `DictionaryProvider`: 初期 Provider は日本語版 Wiktionary。通信失敗は Reader から隔離
+- `useTtsController`: Web Speech API を使う OS 読み上げと文単位の `TextRange` 追従
+- `useAnnotationsStore`: UI 状態と IPC 永続化の分離
 
-DB スキーマ（`bookmarks` / `highlights` / `notes` / `reading_sessions`）と
-ハイライト描画の仕組みは Phase 1 の時点で用意してあるので、
-Phase 2 は主に UI と Service の追加になる。
+辞書以外の読書機能はオフラインで動作する。辞書検索が失敗しても本文閲覧、注釈、
+読み上げは継続できる。

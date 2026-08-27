@@ -10,6 +10,9 @@ interface Args {
   next: () => void
   previous: () => void
   onBackToLibrary: () => void
+  onBookmark: () => void
+  onToggleFullscreen: () => void
+  onEscape?: () => boolean
 }
 
 /** 入力中は本文操作のキーを奪わない。 */
@@ -24,7 +27,7 @@ function isTyping(t: EventTarget | null): boolean {
   )
 }
 
-export function useReaderKeyboard({ next, previous, onBackToLibrary }: Args): void {
+export function useReaderKeyboard({ next, previous, onBackToLibrary, onBookmark, onToggleFullscreen, onEscape }: Args): void {
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       const store = useReaderStore.getState()
@@ -40,6 +43,10 @@ export function useReaderKeyboard({ next, previous, onBackToLibrary }: Args): vo
           case 't':
             e.preventDefault()
             store.setSidebarTab('contents')
+            return
+          case 'b':
+            e.preventDefault()
+            onBookmark()
             return
           case '+':
           case '=':
@@ -59,6 +66,7 @@ export function useReaderKeyboard({ next, previous, onBackToLibrary }: Args): vo
       }
 
       if (e.key === 'Escape') {
+        if (onEscape?.()) return
         if (store.settingsOpen) store.setSettingsOpen(false)
         else if (store.searchOpen) store.closeSearch()
         else if (store.focusMode) store.setFocusMode(false)
@@ -98,12 +106,12 @@ export function useReaderKeyboard({ next, previous, onBackToLibrary }: Args): vo
           break
         case 'F11':
           e.preventDefault()
-          store.setFocusMode(!store.focusMode)
+          onToggleFullscreen()
           break
       }
     }
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [next, previous, onBackToLibrary])
+  }, [next, previous, onBackToLibrary, onBookmark, onToggleFullscreen, onEscape])
 }

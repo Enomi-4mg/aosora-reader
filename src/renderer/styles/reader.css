@@ -33,6 +33,8 @@
   overflow: hidden;
   white-space: nowrap;
 }
+.author-link { padding: 0; color: var(--secondary); background: transparent; border: 0; font-size: 12px; }
+.author-link:hover { color: var(--accent); background: transparent; text-decoration: underline; }
 
 .reader-body { display: flex; min-block-size: 0; }
 
@@ -51,6 +53,9 @@
 .reader.focus .toolbar,
 .reader.focus .sidebar { display: none; }
 .reader.focus .status { opacity: 0.35; }
+.reader.focus.ui-awake .toolbar { display: flex; }
+.reader.focus.ui-awake .sidebar { display: block; }
+.reader.focus.ui-awake .status { opacity: 1; }
 
 .status {
   display: flex;
@@ -62,6 +67,7 @@
   border-block-start: 1px solid var(--border);
 }
 .status-progress { margin-inline-start: auto; }
+.status-remaining { white-space: nowrap; }
 .status-chapter { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- 本文ビューポート ---------- */
@@ -287,6 +293,158 @@ rt {
 .toc-item.lv-3 button { padding-inline-start: 32px; font-size: 12px; }
 .toc-item.current button { background: var(--surface-hover); font-weight: 600; color: var(--accent); }
 
+/* ---------- 注釈：紙面の余白に差す小さな索引 ---------- */
+
+.annotations-panel { padding-block-start: 10px; }
+.annotation-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 0 0 12px;
+  border-block-end: 1px solid var(--border);
+}
+.annotation-tabs button {
+  padding: 7px 4px 9px;
+  color: var(--secondary);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  border-block-end: 2px solid transparent;
+}
+.annotation-tabs button.on { color: var(--fg); border-block-end-color: var(--accent); }
+.annotation-order {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-block-end: 10px;
+  font-size: 11px;
+  color: var(--secondary);
+}
+.annotation-order select { padding: 4px 7px; font-size: 11px; }
+.annotation-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.annotation-item {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  padding: 8px 8px 7px 12px;
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 3px 8px 8px 3px;
+  overflow: hidden;
+}
+.annotation-item::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: 3px;
+  background: var(--accent);
+}
+.all-item { grid-template-columns: 22px 1fr; align-items: start; }
+.annotation-kind { font-size: 10px; color: var(--accent); padding-block-start: 4px; }
+.annotation-item.color-yellow::before { background: #dcae21; }
+.annotation-item.color-green::before { background: #5f9c68; }
+.annotation-item.color-blue::before { background: #568dc2; }
+.annotation-item.color-red::before { background: #bc615b; }
+.annotation-jump {
+  inline-size: 100%;
+  padding: 2px 3px;
+  overflow: hidden;
+  color: inherit;
+  text-align: start;
+  line-height: 1.55;
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+.annotation-actions { display: flex; justify-content: flex-end; gap: 2px; }
+.annotation-actions button, .annotation-delete { padding: 2px 5px; font-size: 10px; color: var(--secondary); }
+.annotation-delete { justify-self: end; }
+.annotation-item textarea { inline-size: 100%; min-block-size: 72px; resize: vertical; }
+.orphan, .panel-error { font-size: 11px; color: #a43e37; }
+
+.selection-menu {
+  position: fixed;
+  z-index: 80;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  max-inline-size: calc(100vw - 24px);
+  padding: 5px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+}
+.selection-menu::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 100%;
+  inset-inline-start: 50%;
+  inline-size: 9px;
+  block-size: 9px;
+  background: var(--bg);
+  border-inline-end: 1px solid var(--border);
+  border-block-end: 1px solid var(--border);
+  transform: translate(-50%, -5px) rotate(45deg);
+}
+.selection-menu button { padding: 5px 8px; font-size: 11px; }
+.selection-menu form { display: flex; align-items: flex-end; gap: 4px; }
+.selection-menu textarea { inline-size: 220px; min-block-size: 54px; resize: none; }
+.highlight-swatches { display: flex; gap: 3px; padding-inline: 3px; }
+.highlight-swatches .swatch {
+  inline-size: 18px;
+  block-size: 18px;
+  padding: 0;
+  border-radius: 50%;
+}
+.swatch.yellow { background: #e6bd3a; }
+.swatch.green { background: #72aa79; }
+.swatch.blue { background: #6b9fce; }
+.swatch.red { background: #c97670; }
+
+.tts-controls { display: flex; align-items: center; border-inline: 1px solid var(--border); }
+.tts-controls button { padding-inline: 6px; }
+
+.dictionary-popover,
+.author-popover {
+  position: fixed;
+  z-index: 75;
+  inset-block-start: 72px;
+  inset-inline-end: 16px;
+  inline-size: min(380px, calc(100vw - 32px));
+  max-block-size: min(560px, calc(100vh - 110px));
+  overflow-y: auto;
+  padding: 14px 16px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+}
+.dictionary-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dictionary-popover ol { padding-inline-start: 1.5em; line-height: 1.7; }
+.dictionary-popover a, .author-popover a { color: var(--accent); }
+.author-popover h3 { margin-block: 18px 6px; font-size: 11px; color: var(--secondary); letter-spacing: 0.08em; }
+.author-popover ul { margin: 0; padding: 0; list-style: none; }
+.author-popover li button { inline-size: 100%; text-align: start; }
+
+.reader-context-menu {
+  position: fixed;
+  z-index: 90;
+  display: grid;
+  inline-size: 200px;
+  padding: 5px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+}
+.reader-context-menu button { text-align: start; background: transparent; border: 0; }
+
 /* ---------- ツールバー検索 ---------- */
 
 .toolbar-search {
@@ -396,6 +554,8 @@ rt {
   color: var(--fg);
   border-block-end-color: var(--accent);
 }
+.data-location { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--secondary); }
+.settings-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 
 @media (max-width: 760px) {
   .toolbar { gap: 4px; padding-inline: 8px; }

@@ -1,5 +1,5 @@
 /** 表示設定(要件 §4.7 / §14 Appearance・Reading)。変更は即座に本文へ反映される。 */
-import { type JSX } from 'react'
+import { useEffect, useState, type JSX } from 'react'
 import { useSettingsStore } from '../state/useSettingsStore'
 import {
   FONT_SIZE_MAX,
@@ -24,9 +24,21 @@ const THEMES: Array<[ThemeName, string]> = [
 ]
 
 export function SettingsPanel({ onClose }: { onClose: () => void }): JSX.Element {
-  const { settings, patch } = useSettingsStore()
+  const { settings, patch, reset } = useSettingsStore()
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
+  const [dataLocation, setDataLocation] = useState('')
   const set = <K extends keyof ReaderSettings>(k: K, v: ReaderSettings[K]) =>
     void patch({ [k]: v } as Partial<ReaderSettings>)
+
+  useEffect(() => {
+    if (!('speechSynthesis' in window)) return
+    const load = (): void => setVoices(window.speechSynthesis.getVoices().filter((voice) => voice.lang.startsWith('ja')))
+    load()
+    window.speechSynthesis.addEventListener('voiceschanged', load)
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', load)
+  }, [])
+
+  useEffect(() => { void window.aozora.getDataLocation().then(setDataLocation) }, [])
 
   return (
     <div className="settings-overlay" role="dialog" aria-label="表示設定">
@@ -168,6 +180,40 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): JSX.Element
               {label}
             </button>
           ))}
+        </div>
+      </section>
+
+      <section>
+        <h3>読み上げ</h3>
+        <label>
+          声
+          <select value={settings.ttsVoice} onChange={(event) => set('ttsVoice', event.target.value)}>
+            <option value="">システム標準</option>
+            {voices.map((voice) => <option key={voice.voiceURI} value={voice.voiceURI}>{voice.name}</option>)}
+          </select>
+        </label>
+        <Range label="速さ" value={settings.ttsRate} min={0.5} max={2} step={0.1}
+          onChange={(value) => set('ttsRate', value)} />
+        <Range label="高さ" value={settings.ttsPitch} min={0.5} max={2} step={0.1}
+          onChange={(value) => set('ttsPitch', value)} />
+        <Range label="音量" value={settings.ttsVolume} min={0} max={1} step={0.1}
+          onChange={(value) => set('ttsVolume', value)} />
+      </section>
+
+      <section>
+        <h3>読了時間</h3>
+        <Range label="文字/分" value={settings.estimatedCharsPerMinute} min={100} max={1200} step={50}
+          onChange={(value) => set('estimatedCharsPerMinute', value)} />
+      </section>
+
+      <section>
+        <h3>詳細</h3>
+        <p className="data-location" title={dataLocation}>{dataLocation}</p>
+        <div className="settings-actions">
+          <button onClick={() => void window.aozora.revealDataLocation()}>保存場所を開く</button>
+          <button onClick={() => {
+            if (window.confirm('表示と読み上げの設定を初期値に戻しますか？')) void reset()
+          }}>設定を初期化</button>
         </div>
       </section>
     </div>

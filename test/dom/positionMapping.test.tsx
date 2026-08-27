@@ -128,6 +128,22 @@ describe('TextRange と DOM Range', () => {
     const p = { bookId: BOOK, chapterId: 'c9', blockId: 'nope', offset: 0 }
     expect(positionToDomPoint(p, document)).toBeNull()
   })
+
+  it('複数 Block にまたがる選択範囲を往復する', () => {
+    const parsed = parseAozora('題\n著\n\n一行目\n二行目\n')
+    const blocks = parsed.chapters.flatMap((chapter) => chapter.blocks)
+      .filter((block) => block.plainText.length > 0)
+    document.body.innerHTML = renderToStaticMarkup(<>
+      {blocks.map((block) => <BlockRenderer key={block.id} block={block} chapterId="c0" />)}
+    </>)
+    const tr = {
+      start: { bookId: BOOK, chapterId: 'c0', blockId: blocks[0]!.id, offset: 1 },
+      end: { bookId: BOOK, chapterId: 'c0', blockId: blocks[1]!.id, offset: 2 }
+    }
+    const dom = textRangeToDomRange(tr, document)
+    expect(dom).not.toBeNull()
+    expect(domRangeToTextRange(BOOK, dom!)).toEqual(tr)
+  })
 })
 
 describe('本文外の点', () => {

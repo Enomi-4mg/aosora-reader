@@ -54,6 +54,7 @@ export function App(): JSX.Element {
           setView('library')
           void library.refresh()
         }}
+        onOpenBook={(bookId) => { void reader.open(bookId) }}
       />
     )
   }

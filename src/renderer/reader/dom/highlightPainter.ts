@@ -9,6 +9,7 @@
  * 実際の色は theme.css の ::highlight(...) 側で決める。内部では固定の色名で扱う。
  */
 import type { TextRange } from '@shared/model/position'
+import type { Highlight as SavedHighlight } from '@shared/model/annotations'
 import { textRangeToDomRange } from './positionMapping'
 
 export const HIGHLIGHT_NAMES = {
@@ -65,4 +66,22 @@ export function paintHighlights(
 
   const cur = current ? textRangeToDomRange(current.range, root) : null
   setHighlight(HIGHLIGHT_NAMES.searchCurrent, cur ? [cur] : [])
+}
+
+/** 保存済みハイライトを色ごとにまとめて描画する。 */
+export function paintSavedHighlights(root: ParentNode, highlights: SavedHighlight[]): void {
+  for (const color of ['yellow', 'green', 'blue', 'red'] as const) {
+    const ranges: Range[] = []
+    for (const highlight of highlights) {
+      if (highlight.color !== color || highlight.orphaned) continue
+      const range = textRangeToDomRange(highlight.range, root)
+      if (range) ranges.push(range)
+    }
+    setHighlight(HIGHLIGHT_NAMES[color], ranges)
+  }
+}
+
+export function paintTtsHighlight(root: ParentNode, range: TextRange | null): void {
+  const domRange = range ? textRangeToDomRange(range, root) : null
+  setHighlight(HIGHLIGHT_NAMES.tts, domRange ? [domRange] : [])
 }

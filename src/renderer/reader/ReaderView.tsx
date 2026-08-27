@@ -6,25 +6,39 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX } from 'react'
 import { currentChapter, useReaderStore } from '../state/useReaderStore'
+import { useAnnotationsStore } from '../state/useAnnotationsStore'
 import { useSettingsStore } from '../state/useSettingsStore'
 import { BlockRenderer } from './BlockRenderer'
 import { LayoutController, type LayoutMetrics } from './layout/LayoutController'
 import { useProgressSaver } from './hooks/useProgressSaver'
 import { useReaderKeyboard } from './hooks/useReaderKeyboard'
 import { ContentsPanel } from '../panels/ContentsPanel'
+import { AnnotationsPanel } from '../panels/AnnotationsPanel'
 import { SearchPanel } from '../panels/SearchPanel'
 import { SettingsPanel } from '../settings/SettingsPanel'
-import { textRangeToDomRange } from './dom/positionMapping'
-import { paintHighlights } from './dom/highlightPainter'
-import { chapterEndPosition, chapterStartPosition } from '@shared/model/position'
+import { domPointToPosition, selectionToTextRange, textRangeToDomRange } from './dom/positionMapping'
+import { paintHighlights, paintSavedHighlights, paintTtsHighlight } from './dom/highlightPainter'
+import { chapterEndPosition, chapterStartPosition, extractRangeText, normalizeRange } from '@shared/model/position'
+import { SelectionMenu, type SelectionState } from './SelectionMenu'
+import { useReadingSession } from './hooks/useReadingSession'
+import { useTtsController } from './hooks/useTtsController'
+import { TtsControls } from './TtsControls'
+import { DictionaryPopover } from '../panels/DictionaryPopover'
+import { AuthorPopover } from '../panels/AuthorPopover'
+import { estimateRemainingMinutes, formatReadingTime } from '@shared/reading'
+import type { DictionaryResult, ReadingStats } from '@shared/model/annotations'
+import { ReaderContextMenu } from './ReaderContextMenu'
+import type { TextPosition } from '@shared/model/position'
 
 interface Props {
   onBackToLibrary: () => void
+  onOpenBook?: (bookId: string) => void
 }
 
-export function ReaderView({ onBackToLibrary }: Props): JSX.Element {
+export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element {
   const store = useReaderStore()
   const { settings } = useSettingsStore()
+  const annotations = useAnnotationsStore()
   const chapter = currentChapter(store)
 
   const viewportRef = useRef<HTMLDivElement>(null)
@@ -34,6 +48,22 @@ export function ReaderView({ onBackToLibrary }: Props): JSX.Element {
   const swipe = useRef({ pointerId: -1, startX: 0, startY: 0, moved: false })
   const suppressPageClick = useRef(false)
   const [dragging, setDragging] = useState(false)
+  const [selection, setSelection] = useState<SelectionState | null>(null)
+  const [dictionaryResult, setDictionaryResult] = useState<DictionaryResult | null>(null)
+  const [dictionaryLoading, setDictionaryLoading] = useState(false)
+  const [dictionaryOpen, setDictionaryOpen] = useState(false)
+  const [authorOpen, setAuthorOpen] = useState(false)
+  const [readingStats, setReadingStats] = useState<ReadingStats | null>(null)
+  const [fullscreen, setFullscreen] = useState(false)
+  const [focusAwake, setFocusAwake] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string; position: TextPosition | null } | null>(null)
+  const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (!store.book) return
+    void annotations.load(store.book.id)
+    return () => annotations.clear()
+  }, [store.book?.id])
 
   /**
    * 復元の基準となる本文位置。
@@ -189,7 +219,7 @@ export function ReaderView({ onBackToLibrary }: Props): JSX.Element {
   }, [])
 
   useProgressSaver(store.book?.id ?? null, store.position, store.percentage)
-  useReaderKeyboard({ next, previous, onBackToLibrary })
+  useReadingSession(store.book?.id ?? null, store.index, store.position, store.percentage)
 
   // --- ハイライト描画(検索一致)。CSS Custom Highlight API に集約 ---
   const currentMatch = useMemo(() => {
@@ -203,6 +233,12 @@ export function ReaderView({ onBackToLibrary }: Props): JSX.Element {
     const matches = store.searchResult?.matches ?? []
     paintHighlights(content, matches, currentMatch)
   }, [store.searchResult, currentMatch, chapter?.id, settings.writingMode])
+
+  useEffect(() => {
+    const content = contentRef.current
+    if (!content) return
+    paintSavedHighlights(content, annotations.highlights)
+  }, [annotations.highlights, chapter?.id, settings.writingMode])
 
   // 検索結果へジャンプ
   useEffect(() => {
@@ -241,6 +277,69 @@ export function ReaderView({ onBackToLibrary }: Props): JSX.Element {
     [store.chapterIndex]
   )
 
+  const bookmarkAt = useCallback((position: TextPosition) => {
+    if (!position || !store.index) return
+    const entry = store.index.byBlockId.get(position.blockId)
+    const nearby = entry?.block.plainText.slice(position.offset, position.offset + 24).trim()
+    const label = `${entry?.chapter.title ?? '現在位置'}${nearby ? ` ― ${nearby}${nearby.length >= 24 ? '…' : ''}` : ''}`
+    void annotations.addBookmark(position, label)
+    store.setSidebarTab('bookmarks')
+  }, [store.index])
+
+  const addBookmark = useCallback(() => {
+    if (store.position) bookmarkAt(store.position)
+  }, [store.position, bookmarkAt])
+
+  const followPosition = useCallback((position: Parameters<typeof store.setPosition>[0]) => {
+    const chapterIdx = store.book?.chapters.findIndex((item) => item.id === position.chapterId) ?? -1
+    if (chapterIdx >= 0) goToPosition(chapterIdx, position)
+  }, [store.book, goToPosition])
+
+  const tts = useTtsController({
+    book: store.book,
+    index: store.index,
+    position: store.position,
+    settings,
+    onFollow: followPosition
+  })
+
+  useEffect(() => {
+    const content = contentRef.current
+    if (content) paintTtsHighlight(content, tts.currentRange)
+  }, [tts.currentRange, chapter?.id])
+
+  useEffect(() => {
+    if (!store.book) return
+    void window.aozora.getReadingStats(store.book.id, settings.estimatedCharsPerMinute)
+      .then(setReadingStats).catch(() => setReadingStats(null))
+  }, [store.book?.id, settings.estimatedCharsPerMinute])
+
+  const toggleFullscreen = useCallback(() => {
+    void window.aozora.getFullscreen()
+      .then((current) => window.aozora.setFullscreen(!current))
+      .then(setFullscreen)
+  }, [])
+
+  const closeTransient = useCallback((): boolean => {
+    if (selection || dictionaryOpen || authorOpen || contextMenu) {
+      clearSelection()
+      setDictionaryOpen(false)
+      setAuthorOpen(false)
+      setContextMenu(null)
+      return true
+    }
+    return false
+  }, [selection, dictionaryOpen, authorOpen, contextMenu])
+
+  useReaderKeyboard({
+    next,
+    previous,
+    onBackToLibrary,
+    onBookmark: addBookmark,
+    onToggleFullscreen: toggleFullscreen,
+    onEscape: closeTransient
+  })
+
   if (store.loading) return <div className="reader-loading">読み込み中…</div>
   if (store.error) {
     return (
@@ -256,6 +355,8 @@ export function ReaderView({ onBackToLibrary }: Props): JSX.Element {
 
   const onPointerDown = (event: React.PointerEvent<HTMLElement>): void => {
     if (settings.readingMode !== 'pagination' || event.button !== 0) return
+    // 本文ドラッグは選択に譲り、余白ドラッグだけをページスワイプに使う。
+    if ((event.target as Element).closest('.content')) return
     swipe.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -278,7 +379,10 @@ export function ReaderView({ onBackToLibrary }: Props): JSX.Element {
 
   const finishSwipe = (event: React.PointerEvent<HTMLElement>): void => {
     const gesture = swipe.current
-    if (gesture.pointerId !== event.pointerId) return
+    if (gesture.pointerId !== event.pointerId) {
+      requestAnimationFrame(captureSelection)
+      return
+    }
     const dx = event.clientX - gesture.startX
     if (gesture.moved && Math.abs(dx) >= 52) {
       // 本文をつかんで動かす感覚に合わせる。縦書きの次ページは左側にあるため
@@ -293,6 +397,35 @@ export function ReaderView({ onBackToLibrary }: Props): JSX.Element {
     }
     swipe.current.pointerId = -1
     setDragging(false)
+    requestAnimationFrame(captureSelection)
+  }
+
+  const captureSelection = (): void => {
+    const content = contentRef.current
+    if (!content || !store.book || !store.index) return
+    const native = window.getSelection()
+    if (!native || native.rangeCount === 0 || native.isCollapsed ||
+      !content.contains(native.anchorNode) || !content.contains(native.focusNode)) {
+      setSelection(null)
+      return
+    }
+    const mapped = selectionToTextRange(store.book.id, content)
+    if (!mapped) return
+    const range = normalizeRange(store.index, mapped)
+    const text = extractRangeText(store.index, range)
+    if (!text) return
+    const rect = native.getRangeAt(0).getBoundingClientRect()
+    setSelection({
+      range,
+      text,
+      x: Math.max(12, Math.min(window.innerWidth - 360, rect.left + rect.width / 2 - 140)),
+      y: Math.max(74, rect.top - 52)
+    })
+  }
+
+  const clearSelection = (): void => {
+    window.getSelection()?.removeAllRanges()
+    setSelection(null)
   }
 
   const pageClick = (action: () => void): void => {
@@ -300,23 +433,37 @@ export function ReaderView({ onBackToLibrary }: Props): JSX.Element {
   }
 
   return (
-    <div className={`reader ${store.focusMode ? 'focus' : ''}`}>
+    <div
+      className={`reader ${store.focusMode ? 'focus' : ''} ${focusAwake ? 'ui-awake' : ''}`}
+      onMouseMove={() => {
+        if (!store.focusMode) return
+        setFocusAwake(true)
+        if (focusTimer.current) clearTimeout(focusTimer.current)
+        focusTimer.current = setTimeout(() => setFocusAwake(false), 1400)
+      }}
+      onClick={() => setContextMenu(null)}
+    >
       <header className="toolbar">
         <button className="ghost" onClick={onBackToLibrary}>← 本棚</button>
-        <button className="ghost" onClick={store.toggleSidebar} aria-expanded={store.sidebarOpen}>
+        <button className="ghost" onClick={() => {
+          if (store.sidebarOpen && store.sidebarTab === 'contents') store.toggleSidebar()
+          else store.setSidebarTab('contents')
+        }} aria-expanded={store.sidebarOpen}>
           目次
         </button>
+        <button className="ghost" onClick={() => store.setSidebarTab('annotations')} aria-label="注釈一覧">注釈</button>
         {store.searchOpen ? (
           <SearchPanel onJump={goToPosition} />
         ) : (
           <div className="toolbar-title">
             <strong>{store.book.title}</strong>
-            <span className="muted">{store.book.author}</span>
+            {store.book.author && <button className="author-link" onClick={() => setAuthorOpen(true)}>{store.book.author}</button>}
           </div>
         )}
         {!store.searchOpen && (
           <button className="ghost" onClick={store.openSearch} aria-label="本文を検索">検索</button>
         )}
+        <TtsControls controller={tts} />
         <button
           className="ghost"
           onClick={() => store.setSettingsOpen(!store.settingsOpen)}
@@ -324,13 +471,18 @@ export function ReaderView({ onBackToLibrary }: Props): JSX.Element {
         >
           設定
         </button>
+        <button className="ghost" onClick={addBookmark} aria-label="現在位置に栞を追加">栞</button>
+        <button className="ghost" onClick={() => setAuthorOpen(!authorOpen)} aria-label="著者情報">著者</button>
+        <button className="ghost" onClick={() => store.setFocusMode(!store.focusMode)} aria-pressed={store.focusMode}>集中</button>
+        <button className="ghost" onClick={toggleFullscreen} aria-pressed={fullscreen}>全画面</button>
         {store.settingsOpen && <SettingsPanel onClose={() => store.setSettingsOpen(false)} />}
+        {authorOpen && <AuthorPopover book={store.book} onOpenBook={onOpenBook} onClose={() => setAuthorOpen(false)} />}
       </header>
 
       <div className="reader-body">
         {store.sidebarOpen && (
           <aside className="sidebar" aria-label="サイドパネル">
-            <ContentsPanel
+            {store.sidebarTab === 'contents' ? <ContentsPanel
               onJump={(i: number) => {
                 // 目次からのジャンプは章の先頭へ
                 const target = store.book?.chapters[i]?.blocks[0]
@@ -346,7 +498,10 @@ export function ReaderView({ onBackToLibrary }: Props): JSX.Element {
                 store.setChapter(i)
                 if (pendingRestore.current) store.setPosition(pendingRestore.current)
               }}
-            />
+            /> : <AnnotationsPanel onJump={(position) => {
+              const chapterIdx = store.book?.chapters.findIndex((item) => item.id === position.chapterId) ?? -1
+              if (chapterIdx >= 0) goToPosition(chapterIdx, position)
+            }} />}
           </aside>
         )}
 
@@ -356,6 +511,22 @@ export function ReaderView({ onBackToLibrary }: Props): JSX.Element {
           onPointerMove={onPointerMove}
           onPointerUp={finishSwipe}
           onPointerCancel={finishSwipe}
+          onContextMenu={(event) => {
+            event.preventDefault()
+            const text = window.getSelection()?.toString().trim() ?? ''
+            const caret = (document as Document & {
+              caretRangeFromPoint?: (x: number, y: number) => Range | null
+            }).caretRangeFromPoint?.(event.clientX, event.clientY)
+            const position = caret && store.book
+              ? domPointToPosition(store.book.id, caret.startContainer, caret.startOffset)
+              : store.position
+            setContextMenu({
+              x: Math.min(event.clientX, window.innerWidth - 210),
+              y: Math.min(event.clientY, window.innerHeight - 130),
+              text,
+              position
+            })
+          }}
         >
           <div
             ref={viewportRef}
@@ -394,12 +565,66 @@ export function ReaderView({ onBackToLibrary }: Props): JSX.Element {
         </main>
       </div>
 
+      {selection && (
+        <SelectionMenu
+          selection={selection}
+          onHighlight={(color) => { void annotations.addHighlight(selection.range, selection.text, color); clearSelection() }}
+          onMemo={(text) => { void annotations.saveNote({ range: selection.range, text }); clearSelection(); store.setSidebarTab('notes') }}
+          onCopy={() => { void window.aozora.copyText(selection.text); clearSelection() }}
+          onDictionary={() => {
+            const term = selection.text.trim().slice(0, 80)
+            setDictionaryOpen(true)
+            setDictionaryLoading(true)
+            setDictionaryResult({ term, definitions: [], source: '日本語版Wiktionary' })
+            void window.aozora.searchDictionary(term).then(setDictionaryResult)
+              .finally(() => setDictionaryLoading(false))
+            clearSelection()
+          }}
+          onClose={clearSelection}
+        />
+      )}
+      {dictionaryOpen && <DictionaryPopover result={dictionaryResult} loading={dictionaryLoading} onClose={() => setDictionaryOpen(false)} />}
+      {contextMenu && <ReaderContextMenu
+        x={contextMenu.x}
+        y={contextMenu.y}
+        hasSelection={contextMenu.text.length > 0}
+        onBookmark={() => {
+          if (contextMenu.position) bookmarkAt(contextMenu.position)
+          setContextMenu(null)
+        }}
+        onMemo={() => {
+          const text = window.prompt('現在位置へのメモ')
+          if (text?.trim() && contextMenu.position) {
+            void annotations.saveNote({ position: contextMenu.position, text })
+            store.setSidebarTab('notes')
+          }
+          setContextMenu(null)
+        }}
+        onSearch={() => {
+          store.openSearch()
+          void store.runSearch(contextMenu.text)
+          setContextMenu(null)
+        }}
+        onSettings={() => { store.setSettingsOpen(true); setContextMenu(null) }}
+        onClose={() => setContextMenu(null)}
+      />}
+
       <footer className="status" role="status">
         <span className="status-chapter">{chapter.title}</span>
         <span className="status-progress">{pct}%</span>
         {settings.readingMode === 'pagination' && (
           <span className="muted">
             {metrics.currentPage + 1} / {metrics.pageCount}
+          </span>
+        )}
+        <span className="status-remaining">{formatReadingTime(estimateRemainingMinutes(
+          store.book.totalCharacters,
+          store.percentage,
+          readingStats?.estimatedCharsPerMinute ?? settings.estimatedCharsPerMinute
+        ))}</span>
+        {readingStats && readingStats.totalDurationMs > 0 && (
+          <span className="muted" title={`${readingStats.sessionCount}回の読書セッション`}>
+            読書 {Math.max(1, Math.round(readingStats.totalDurationMs / 60_000))}分
           </span>
         )}
       </footer>

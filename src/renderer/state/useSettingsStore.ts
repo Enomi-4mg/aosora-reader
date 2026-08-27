@@ -9,6 +9,7 @@ interface SettingsState {
   patch: (p: Partial<ReaderSettings>) => Promise<void>
   adjustFontSize: (delta: number) => Promise<void>
   resetFontSize: () => Promise<void>
+  reset: () => Promise<void>
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -37,5 +38,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   async resetFontSize() {
     await get().patch({ fontSize: DEFAULT_SETTINGS.fontSize })
+  },
+
+  async reset() {
+    const saved = await window.aozora.saveSettings(DEFAULT_SETTINGS)
+    set({ settings: saved })
   }
 }))
