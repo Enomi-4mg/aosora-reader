@@ -104,10 +104,11 @@ app.whenReady().then(async () => {
     await js(`document.querySelectorAll('.toc-item button')[${i}].click()`)
     await sleep(900)
     const { total } = await pagesNow()
-    if (total >= 4) found = true
+    // 3ページあれば「両端でない内側のページ」が必ず存在する
+    if (total >= 3) found = true
   }
   const before0 = await pagesNow()
-  check('複数ページある章を見つけられた', found, `${before0.total}ページ`)
+  check('内側のページを持つ章を見つけられた', found, `${before0.total}ページ`)
 
   // 章の中ほどまで進める
   const want = Math.floor(before0.total / 2)
