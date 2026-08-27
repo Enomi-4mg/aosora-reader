@@ -111,10 +111,16 @@ export class AnnotationRepository {
     const rows = this.db.prepare(
       'SELECT * FROM highlights WHERE book_id = ? ORDER BY created_at'
     ).all(bookId) as unknown as Array<Record<string, unknown>>
+
+    // 本文全体の連結は重い。orphan が1件も無ければ一度も作らず、
+    // 必要になったときだけ作って全ハイライトで使い回す。
+    let corpus: Corpus | null = null
+    const getCorpus = (): Corpus => (corpus ??= buildCorpus(this.blockRows(bookId)))
+
     return rows.map((r) => {
       const storedRange = { start: pos(bookId, r, 'start_'), end: pos(bookId, r, 'end_') }
       const selectedText = r.selected_text as string
-      const range = this.resolveRange(bookId, storedRange, selectedText)
+      const range = this.resolveRange(bookId, storedRange, selectedText, getCorpus)
       return {
         id: r.id as string, bookId, range: range ?? storedRange, selectedText,
         color: r.color as HighlightColor, createdAt: r.created_at as string,
@@ -145,28 +151,15 @@ export class AnnotationRepository {
   }
 
   /** 保存範囲 → selectedText 近傍 → 作品全体の順で復旧する。 */
-  private resolveRange(bookId: string, stored: TextRange, selectedText: string): TextRange | null {
+  private resolveRange(
+    bookId: string,
+    stored: TextRange,
+    selectedText: string,
+    getCorpus: () => Corpus
+  ): TextRange | null {
     // blockId は同一原本から決定的に生成される。両端が実在すれば保存範囲を最優先する。
     if (this.rangeExists(stored)) return stored
-    return this.findSelectedText(bookId, stored, selectedText)
-  }
-
-  private findSelectedText(bookId: string, stored: TextRange, selectedText: string): TextRange | null {
-    if (!selectedText) return null
-    const rows = this.blockRows(bookId)
-    const joined = joinRows(rows)
-    const approximate = globalOffset(rows, stored.start) ?? 0
-    const hits: number[] = []
-    let at = joined.text.indexOf(selectedText)
-    while (at >= 0 && hits.length < 100) {
-      hits.push(at)
-      at = joined.text.indexOf(selectedText, at + 1)
-    }
-    if (hits.length === 0) return null
-    hits.sort((a, b) => Math.abs(a - approximate) - Math.abs(b - approximate))
-    const start = positionAt(bookId, rows, joined.starts, hits[0]!)
-    const end = positionAt(bookId, rows, joined.starts, hits[0]! + selectedText.length)
-    return start && end ? { start, end } : null
+    return findSelectedText(bookId, stored, selectedText, getCorpus)
   }
 
   private blockRows(bookId: string): BlockRow[] {
@@ -178,27 +171,57 @@ export class AnnotationRepository {
 
 interface BlockRow { chapter_id: string; id: string; plain_text: string }
 
-function joinRows(rows: BlockRow[]): { text: string; starts: number[] } {
+/** 作品全体の plainText を改行で連結したもの。orphan ハイライトの復旧に使う。 */
+interface Corpus {
+  rows: BlockRow[]
+  /** rows[i] の text 内での開始位置。 */
+  starts: number[]
+  text: string
+}
+
+function buildCorpus(rows: BlockRow[]): Corpus {
   const starts: number[] = []
-  let text = ''
+  let at = 0
   for (const row of rows) {
-    starts.push(text.length)
-    text += (text ? '\n' : '') + row.plain_text
-    if (starts.length > 1) starts[starts.length - 1]! += 1
+    starts.push(at)
+    at += row.plain_text.length + 1 // 連結時に挟む '\n' のぶん
   }
-  return { text, starts }
+  return { rows, starts, text: rows.map((row) => row.plain_text).join('\n') }
 }
 
-function globalOffset(rows: BlockRow[], position: TextPosition): number | null {
-  const joined = joinRows(rows)
-  const index = rows.findIndex((row) => row.id === position.blockId)
-  return index < 0 ? null : joined.starts[index]! + Math.min(position.offset, rows[index]!.plain_text.length)
+function findSelectedText(
+  bookId: string,
+  stored: TextRange,
+  selectedText: string,
+  getCorpus: () => Corpus
+): TextRange | null {
+  if (!selectedText) return null
+  const corpus = getCorpus()
+  const approximate = globalOffset(corpus, stored.start) ?? 0
+  const hits: number[] = []
+  let at = corpus.text.indexOf(selectedText)
+  while (at >= 0 && hits.length < 100) {
+    hits.push(at)
+    at = corpus.text.indexOf(selectedText, at + 1)
+  }
+  if (hits.length === 0) return null
+  hits.sort((a, b) => Math.abs(a - approximate) - Math.abs(b - approximate))
+  const start = positionAt(bookId, corpus, hits[0]!)
+  const end = positionAt(bookId, corpus, hits[0]! + selectedText.length)
+  return start && end ? { start, end } : null
 }
 
-function positionAt(bookId: string, rows: BlockRow[], starts: number[], offset: number): TextPosition | null {
-  for (let index = rows.length - 1; index >= 0; index--) {
-    const row = rows[index]!
-    const start = starts[index]!
+function globalOffset(corpus: Corpus, position: TextPosition): number | null {
+  const index = corpus.rows.findIndex((row) => row.id === position.blockId)
+  if (index < 0) return null
+  return corpus.starts[index]! +
+    Math.min(position.offset, corpus.rows[index]!.plain_text.length)
+}
+
+function positionAt(bookId: string, corpus: Corpus, offset: number): TextPosition | null {
+  for (let index = corpus.rows.length - 1; index >= 0; index--) {
+    const row = corpus.rows[index]!
+    const start = corpus.starts[index]!
     if (offset >= start) return {
       bookId, chapterId: row.chapter_id, blockId: row.id,
       offset: Math.max(0, Math.min(row.plain_text.length, offset - start))
