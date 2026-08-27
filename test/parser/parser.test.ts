@@ -453,4 +453,40 @@ describe('ヘッダとメタデータ', () => {
     expect(r.metadata.bibliography).toContain('新潮文庫')
     expect(body).not.toContain('底本')
   })
+
+  it('本文中に「底本」で始まる行があっても以降の本文を捨てない', () => {
+    const src = [
+      'こころ',
+      '夏目漱石',
+      '',
+      '　本文の一行目。',
+      '底本という言葉について論じる段落である。',
+      '　本文の三行目。ここも読めなければならない。',
+      '',
+      '底本：「こころ」新潮文庫',
+      '入力：だれか'
+    ].join('\n')
+    const r = parseAozora(src)
+    const body = r.chapters.flatMap((c) => c.blocks).map((b) => b.plainText).join('')
+    expect(body).toContain('本文の三行目')
+    expect(body).toContain('底本という言葉について')
+    expect(r.metadata.bibliography).toContain('新潮文庫')
+    expect(r.metadata.bibliography).not.toContain('論じる段落')
+  })
+
+  it('奥付の内側の「底本の親本：」を奥付の開始と取り違えない', () => {
+    const src = [
+      'こころ',
+      '夏目漱石',
+      '',
+      '　本文である。',
+      '',
+      '底本：「こころ」新潮文庫',
+      '底本の親本：「漱石全集」岩波書店',
+      '入力：だれか'
+    ].join('\n')
+    const r = parseAozora(src)
+    expect(r.metadata.bibliography).toContain('新潮文庫')
+    expect(r.metadata.bibliography).toContain('漱石全集')
+  })
 })

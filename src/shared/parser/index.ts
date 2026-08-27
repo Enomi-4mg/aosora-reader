@@ -28,7 +28,14 @@ export interface ParseResult {
 
 /** 凡例ブロックを囲む罫線(半角ハイフンの並び)。 */
 const RULE = /^-{20,}\s*$/
-const COLOPHON = /^(底本|底本：|底本:)/
+
+/**
+ * 奥付の開始行。区切り記号まで含めて一致させる。
+ *
+ * 「底本」だけを見ると本文中で底本について論じている行に当たってしまう。
+ * また区切り記号を要求することで、奥付の内側にある「底本の親本：」とも区別できる。
+ */
+const COLOPHON = /^底本[：:]/
 
 export function parseAozora(source: string): ParseResult {
   const issues = new IssueCollector()
@@ -68,8 +75,10 @@ export function parseAozora(source: string): ParseResult {
   }
 
   // --- 底本(奥付) ---
+  // 奥付はファイル末尾にあるので末尾から探す。先頭から探すと、本文中に
+  // 「底本：」で始まる行があったときにそこから後ろの本文をすべて失う。
   let bodyEnd = lines.length
-  const colophonAt = findIndexFrom(lines, ptr, (l) => COLOPHON.test(l.trim()))
+  const colophonAt = findLastIndexFrom(lines, ptr, (l) => COLOPHON.test(l.trim()))
   if (colophonAt !== -1) {
     bodyEnd = colophonAt
     metadata.bibliography = lines.slice(colophonAt).join('\n').trim()
@@ -100,6 +109,18 @@ function findIndexFrom(
   pred: (l: string) => boolean
 ): number {
   for (let i = from; i < lines.length; i++) {
+    if (pred(lines[i]!)) return i
+  }
+  return -1
+}
+
+/** from 以降で条件を満たす最後の行。奥付のように末尾側にあるものを探すのに使う。 */
+function findLastIndexFrom(
+  lines: string[],
+  from: number,
+  pred: (l: string) => boolean
+): number {
+  for (let i = lines.length - 1; i >= from; i--) {
     if (pred(lines[i]!)) return i
   }
   return -1
