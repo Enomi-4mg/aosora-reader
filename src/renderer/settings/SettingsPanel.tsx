@@ -1,5 +1,5 @@
 /** 表示設定(要件 §4.7 / §14 Appearance・Reading)。変更は即座に本文へ反映される。 */
-import { useEffect, useState, type JSX } from 'react'
+import { useEffect, useRef, useState, type JSX } from 'react'
 import { useSettingsStore } from '../state/useSettingsStore'
 import {
   DEFAULT_SETTINGS,
@@ -231,6 +231,15 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): JSX.Element
   )
 }
 
+/**
+ * スライダーのつまみは即座に動かしつつ、確定は間引く。
+ *
+ * range の onChange はドラッグ中ずっと発火する。そのまま設定を反映すると
+ * 1ドラッグで数百回の永続化と再ページングが走るため、表示用の値は
+ * ローカルに持ち、実際の反映だけを debounce する。
+ */
+const COMMIT_DELAY_MS = 120
+
 function Range({
   label,
   value,
@@ -248,6 +257,30 @@ function Range({
   suffix?: string
   onChange: (v: number) => void
 }): JSX.Element {
+  const [live, setLive] = useState(value)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pending = useRef(false)
+
+  // 外から値が変わったとき(初期化・設定の初期化・別経路のフォントサイズ変更)は追従する。
+  // 自分の debounce 待ちのあいだは、確定前の値を巻き戻さない。
+  useEffect(() => {
+    if (!pending.current) setLive(value)
+  }, [value])
+
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current)
+  }, [])
+
+  const commit = (next: number): void => {
+    setLive(next)
+    pending.current = true
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(() => {
+      pending.current = false
+      onChange(next)
+    }, COMMIT_DELAY_MS)
+  }
+
   return (
     <label className="range">
       <span>{label}</span>
@@ -256,10 +289,10 @@ function Range({
         min={min}
         max={max}
         step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
+        value={live}
+        onChange={(e) => commit(Number(e.target.value))}
       />
-      <output>{step < 1 ? value.toFixed(2) : value}{suffix}</output>
+      <output>{step < 1 ? live.toFixed(2) : live}{suffix}</output>
     </label>
   )
 }
