@@ -29,7 +29,6 @@ export interface LayoutContext {
   bookId: string
 }
 
-const COLUMN_GAP_RATIO = 2.2 // fontSize に対する段間の比
 const EDGE_EPSILON = 1
 
 export class LayoutController {
@@ -54,6 +53,17 @@ export class LayoutController {
     return this.ctx.settings.readingMode === 'pagination'
   }
 
+  /**
+   * 段間(px)。CSS の column-gap を唯一の正とする。
+   *
+   * ここで係数を持って計算し直すと CSS と二重管理になり、丸め方の違いが
+   * ページごとに累積して境界が一列ずれる。縦書きは段組を使わないので 0。
+   */
+  private columnGap(): number {
+    const gap = Number.parseFloat(getComputedStyle(this.ctx.content).columnGap)
+    return Number.isFinite(gap) ? gap : 0
+  }
+
   /** 固定余白を除いた、実際に本文が見える横幅。 */
   private pageWidth(): number {
     const vp = this.ctx.viewport
@@ -67,8 +77,8 @@ export class LayoutController {
    * フォント変更・writingMode 変更・リサイズのたびに呼ぶ。
    */
   measure(): LayoutMetrics {
-    const { content, settings } = this.ctx
-    this.gap = Math.round(settings.fontSize * COLUMN_GAP_RATIO)
+    const { content } = this.ctx
+    this.gap = this.vertical ? 0 : this.columnGap()
     const pageWidth = this.pageWidth()
 
     if (!this.paginated) {

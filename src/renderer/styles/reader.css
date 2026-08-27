@@ -134,6 +134,7 @@
   block-size: 100%;
   inline-size: 100%;
   column-count: var(--column-count);
+  /* 段間の唯一の定義。LayoutController は computed style からこの値を読む。 */
   column-gap: calc(var(--font-size) * 2.2);
   column-fill: auto;
 }
