@@ -75,6 +75,7 @@ input, select {
 
 .library-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: center;
   padding: 10px 16px;
@@ -112,9 +113,13 @@ input, select {
 }
 .shelf.grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fill, 210px);
+  grid-auto-rows: 154px;
+  justify-content: start;
+  align-content: start;
   gap: 14px;
 }
+.shelf.grid > li { inline-size: 210px; block-size: 154px; }
 .shelf.list { display: flex; flex-direction: column; gap: 6px; }
 
 .card {
@@ -175,3 +180,49 @@ input, select {
 .modal h2 { margin: 0; font-size: 16px; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .check { display: flex; gap: 8px; align-items: center; }
+
+.catalog-modal {
+  inline-size: min(720px, 92vw);
+  block-size: min(680px, 82vh);
+  padding: 0;
+  overflow: hidden;
+}
+.catalog-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px 10px;
+}
+.catalog-head p { margin: 5px 0 0; }
+.catalog-search { display: flex; gap: 8px; padding: 0 20px 14px; }
+.catalog-search input { flex: 1; }
+.catalog-error { margin: 0; padding: 8px 20px; color: #a43e37; }
+.catalog-results { flex: 1; overflow-y: auto; border-block-start: 1px solid var(--border); }
+.catalog-results > .muted { padding: 18px 20px; }
+.catalog-work {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  border-block-end: 1px solid var(--border);
+}
+.catalog-work > div { display: grid; gap: 3px; min-inline-size: 0; }
+.catalog-work strong { font-size: 14px; }
+.catalog-work span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 900px) {
+  .library-bar { gap: 8px; padding-inline: 12px; }
+  .search-input { min-inline-size: 180px; max-inline-size: none; }
+  .shelf { padding: 14px; }
+}
+
+@media (max-width: 680px) {
+  .brand { flex: 1 0 calc(100% - 8px); }
+  .search-input { order: 2; flex: 1 0 calc(100% - 120px); }
+  .select { order: 3; }
+  .library-bar .seg { order: 4; }
+  .library-bar > button { order: 5; }
+  .catalog-modal { inline-size: calc(100vw - 20px); block-size: calc(100vh - 40px); }
+  .catalog-work { align-items: flex-start; padding-inline: 14px; }
+}

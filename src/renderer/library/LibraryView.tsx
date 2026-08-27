@@ -1,7 +1,8 @@
 /** 本棚(要件 §4.13 / §4.14 / §12)。 */
-import { useEffect, useState, type JSX } from 'react'
+import { useEffect, useState, type FormEvent, type JSX } from 'react'
 import { useLibraryStore, selectVisibleBooks, type SortKey } from '../state/useLibraryStore'
 import type { BookSummary } from '@shared/model/document'
+import type { AozoraCatalogWork } from '@shared/ipc'
 
 const SORT_LABELS: Array<[SortKey, string]> = [
   ['recent', '最近読んだ順'],
@@ -19,6 +20,7 @@ export function LibraryView({ onOpen }: Props): JSX.Element {
   const s = useLibraryStore()
   const books = selectVisibleBooks(s)
   const [pendingDelete, setPendingDelete] = useState<BookSummary | null>(null)
+  const [catalogOpen, setCatalogOpen] = useState(false)
 
   useEffect(() => {
     void s.refresh()
@@ -64,8 +66,11 @@ export function LibraryView({ onOpen }: Props): JSX.Element {
             リスト
           </button>
         </div>
-        <button className="primary" disabled={s.busy} onClick={() => void s.importDialog()}>
-          {s.busy ? '取り込み中…' : '作品を追加'}
+        <button disabled={s.busy} onClick={() => void s.importDialog()}>
+          ファイルから追加
+        </button>
+        <button className="primary" disabled={s.busy} onClick={() => setCatalogOpen(true)}>
+          青空文庫から追加
         </button>
       </header>
 
@@ -103,6 +108,100 @@ export function LibraryView({ onOpen }: Props): JSX.Element {
           }}
         />
       )}
+      {catalogOpen && (
+        <AozoraCatalogDialog
+          busy={s.busy}
+          onClose={() => setCatalogOpen(false)}
+          onDownload={async (workId) => {
+            const ok = await s.downloadWork(workId)
+            if (ok) setCatalogOpen(false)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function AozoraCatalogDialog({
+  busy,
+  onClose,
+  onDownload
+}: {
+  busy: boolean
+  onClose: () => void
+  onDownload: (workId: string) => Promise<void>
+}): JSX.Element {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<AozoraCatalogWork[]>([])
+  const [searching, setSearching] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const search = async (event: FormEvent): Promise<void> => {
+    event.preventDefault()
+    if (query.trim().length < 2) {
+      setError('タイトルまたは著者名を2文字以上入力してください。')
+      return
+    }
+    setSearching(true)
+    setError(null)
+    try {
+      const found = await window.aozora.searchAozoraCatalog(query)
+      setResults(found)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '公式カタログを検索できませんでした。')
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal catalog-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="青空文庫から作品を追加"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="catalog-head">
+          <div>
+            <h2>青空文庫から追加</h2>
+            <p className="muted small">公式の公開作品をタイトル・著者名で検索します。</p>
+          </div>
+          <button className="ghost" onClick={onClose} aria-label="閉じる">×</button>
+        </div>
+        <form className="catalog-search" onSubmit={(e) => void search(e)}>
+          <input
+            autoFocus
+            type="search"
+            value={query}
+            placeholder="例：こころ、夏目漱石"
+            aria-label="青空文庫を検索"
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <button className="primary" disabled={searching || busy}>
+            {searching ? '検索中…' : '検索'}
+          </button>
+        </form>
+        {error && <p className="catalog-error" role="alert">{error}</p>}
+        <div className="catalog-results" aria-live="polite">
+          {!searching && !error && results.length === 0 && query.trim().length >= 2 && (
+            <p className="muted">検索結果はありません。</p>
+          )}
+          {results.map((work) => (
+            <article className="catalog-work" key={work.id}>
+              <div>
+                <strong>{work.title}</strong>
+                <span>{work.author}</span>
+                <span className="small muted">公開日 {work.publishedAt}</span>
+              </div>
+              <button disabled={busy} onClick={() => void onDownload(work.id)}>
+                {busy ? '追加中…' : '追加'}
+              </button>
+            </article>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

@@ -46,11 +46,22 @@ export interface OpenBookResult {
   progress: ReadingProgressDto | null
 }
 
+export interface AozoraCatalogWork {
+  id: string
+  title: string
+  titleKana: string
+  author: string
+  publishedAt: string
+  cardUrl: string
+}
+
 export interface AozoraIpcApi {
   listBooks(): Promise<BookSummary[]>
   importDialog(): Promise<ImportOutcome[]>
   importPaths(paths: string[]): Promise<ImportOutcome[]>
   importWithEncoding(path: string, encoding: string): Promise<ImportOutcome>
+  searchAozoraCatalog(query: string): Promise<AozoraCatalogWork[]>
+  downloadAozoraWork(workId: string): Promise<ImportOutcome>
   deleteBook(bookId: string, keepUserData: boolean): Promise<void>
 
   openBook(bookId: string): Promise<OpenBookResult | null>
@@ -72,6 +83,8 @@ export const IPC_CHANNELS = [
   'importDialog',
   'importPaths',
   'importWithEncoding',
+  'searchAozoraCatalog',
+  'downloadAozoraWork',
   'deleteBook',
   'openBook',
   'saveProgress',

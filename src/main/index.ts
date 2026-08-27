@@ -1,7 +1,7 @@
 /**
  * Electron main プロセス。fs / SQLite / パーサーはすべてこちら側に閉じる。
  */
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, net, shell } from 'electron'
 import { join } from 'node:path'
 import { normalizeSettings, type ReaderSettings } from '@shared/model/settings'
 import type { AozoraIpcApi, ImportOutcome, OpenBookResult } from '@shared/ipc'
@@ -11,6 +11,7 @@ import { ProgressRepository } from './repositories/ProgressRepository'
 import { SettingsRepository } from './repositories/SettingsRepository'
 import { ImportService, type ImportOutcome as ServiceOutcome } from './services/ImportService'
 import { SearchService } from './services/SearchService'
+import { AozoraCatalogService } from './services/AozoraCatalogService'
 import type { SupportedEncoding } from './import/decode'
 
 let db: Db
@@ -19,6 +20,7 @@ let progress: ProgressRepository
 let settings: SettingsRepository
 let importer: ImportService
 let search: SearchService
+let catalog: AozoraCatalogService
 
 function initServices(): void {
   db = openDatabase(join(app.getPath('userData'), 'library.db'))
@@ -27,6 +29,11 @@ function initServices(): void {
   settings = new SettingsRepository(db)
   importer = new ImportService(books)
   search = new SearchService(db)
+  catalog = new AozoraCatalogService(importer, async (url) => {
+    const response = await net.fetch(url, { signal: AbortSignal.timeout(30_000) })
+    if (!response.ok) throw new Error(`青空文庫から取得できませんでした (${response.status})`)
+    return new Uint8Array(await response.arrayBuffer())
+  })
 }
 
 function createWindow(): BrowserWindow {
@@ -104,6 +111,14 @@ const handlers: AozoraIpcApi = {
 
   async importWithEncoding(path: string, encoding: string) {
     return toDto(await importer.importFile(path, encoding as SupportedEncoding))
+  },
+
+  async searchAozoraCatalog(query: string) {
+    return catalog.search(query)
+  },
+
+  async downloadAozoraWork(workId: string) {
+    return toDto(await catalog.download(workId))
   },
 
   async deleteBook(bookId: string, keepUserData: boolean) {

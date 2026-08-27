@@ -17,6 +17,7 @@ interface LibraryState {
   refresh: () => Promise<void>
   importDialog: () => Promise<void>
   importPaths: (paths: string[]) => Promise<void>
+  downloadWork: (workId: string) => Promise<boolean>
   remove: (bookId: string, keepUserData: boolean) => Promise<void>
   setQuery: (q: string) => void
   setSort: (s: SortKey) => void
@@ -74,6 +75,21 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       await get().refresh()
     } catch (e) {
       set({ notice: e instanceof Error ? e.message : '取り込みに失敗しました。' })
+    } finally {
+      set({ busy: false })
+    }
+  },
+
+  async downloadWork(workId) {
+    set({ busy: true })
+    try {
+      const result = await window.aozora.downloadAozoraWork(workId)
+      set({ notice: summarize([result]) })
+      await get().refresh()
+      return result.status !== 'error' && result.status !== 'needs-encoding'
+    } catch (e) {
+      set({ notice: e instanceof Error ? e.message : 'ダウンロードに失敗しました。' })
+      return false
     } finally {
       set({ busy: false })
     }

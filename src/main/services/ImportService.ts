@@ -34,7 +34,21 @@ export class ImportService {
   ): Promise<ImportOutcome> {
     try {
       const raw = new Uint8Array(await readFile(path))
-      const ext = extname(path).toLowerCase()
+      return await this.importBytes(raw, path, basename(path, extname(path)), forcedEncoding)
+    } catch (e) {
+      return this.error(path, e)
+    }
+  }
+
+  /** ダウンロード済みの公式作品を、ローカルファイルと同じ経路で取り込む。 */
+  async importBytes(
+    raw: Uint8Array,
+    sourcePath: string,
+    fallbackTitle: string,
+    forcedEncoding?: SupportedEncoding
+  ): Promise<ImportOutcome> {
+    try {
+      const ext = extname(new URL(sourcePath, 'file:///').pathname).toLowerCase()
 
       let bytes: Uint8Array<ArrayBufferLike> = raw
       let sourceType: SourceType = 'txt'
@@ -53,7 +67,7 @@ export class ImportService {
         if (d.ambiguous) {
           return {
             status: 'needs-encoding',
-            path,
+            path: sourcePath,
             candidates: ['Shift_JIS', 'UTF-8']
           }
         }
@@ -73,11 +87,11 @@ export class ImportService {
       const now = new Date().toISOString()
       const book: Book = {
         id: existing?.id ?? bookIdFromHash(sourceHash),
-        title: parsed.title || basename(path, ext),
+        title: parsed.title || fallbackTitle,
         subtitle: parsed.subtitle,
         author: parsed.author,
         translator: parsed.translator,
-        sourcePath: path,
+        sourcePath,
         sourceType,
         encoding,
         sourceHash,
@@ -107,14 +121,7 @@ export class ImportService {
         issues: parsed.issues
       }
     } catch (e) {
-      // 壊れた ZIP や読めないファイルでアプリを落とさない(要件 §9)
-      const message =
-        e instanceof ZipError
-          ? e.message
-          : e instanceof Error
-            ? `読み込みに失敗しました: ${e.message}`
-            : '不明なエラーが発生しました。'
-      return { status: 'error', path, message }
+      return this.error(sourcePath, e)
     }
   }
 
@@ -122,5 +129,16 @@ export class ImportService {
     const out: ImportOutcome[] = []
     for (const p of paths) out.push(await this.importFile(p))
     return out
+  }
+
+  private error(path: string, e: unknown): ImportOutcome {
+    // 壊れた ZIP や読めないファイルでアプリを落とさない(要件 §9)
+    const message =
+      e instanceof ZipError
+        ? e.message
+        : e instanceof Error
+          ? `読み込みに失敗しました: ${e.message}`
+          : '不明なエラーが発生しました。'
+    return { status: 'error', path, message }
   }
 }
