@@ -21,6 +21,24 @@ export type ImportOutcome =
   | { status: 'needs-encoding'; path: string; candidates: SupportedEncoding[] }
   | { status: 'error'; path: string; message: string }
 
+/**
+ * 取り込み元の拡張子。
+ *
+ * ローカルパスを URL として解釈してはいけない。'?' や '#' を含むファイル名で
+ * pathname が途中で切れ、ZIP をテキストとして読んでしまう。
+ * URL なのは公式カタログから取得したときだけ。
+ */
+function extensionOf(sourcePath: string): string {
+  if (/^https?:\/\//i.test(sourcePath)) {
+    try {
+      return extname(new URL(sourcePath).pathname).toLowerCase()
+    } catch {
+      return ''
+    }
+  }
+  return extname(sourcePath).toLowerCase()
+}
+
 export class ImportService {
   constructor(private readonly books: BookRepository) {}
 
@@ -48,7 +66,7 @@ export class ImportService {
     forcedEncoding?: SupportedEncoding
   ): Promise<ImportOutcome> {
     try {
-      const ext = extname(new URL(sourcePath, 'file:///').pathname).toLowerCase()
+      const ext = extensionOf(sourcePath)
 
       let bytes: Uint8Array<ArrayBufferLike> = raw
       let sourceType: SourceType = 'txt'
