@@ -241,23 +241,27 @@ export function textRangeToDomRange(
   const s = positionToDomPoint(r.start, root)
   const e = positionToDomPoint(r.end, root)
   if (!s || !e) return null
+
+  // start > end になっていたら入れ替える(復元時のずれに備える)。
+  // Range に入れてから直すことはできない。setEnd は end が start より前のとき
+  // Range をその一点へ潰してしまい、逆転していた事実が消えるため。
+  const [from, to] = isBefore(e, s) ? [e, s] : [s, e]
+
   const range = document.createRange()
   try {
-    range.setStart(s.node, s.offset)
-    range.setEnd(e.node, e.offset)
+    range.setStart(from.node, from.offset)
+    range.setEnd(to.node, to.offset)
   } catch {
     return null
   }
-  // start > end になっていたら入れ替える(復元時のずれに備える)
-  if (range.collapsed && range.startContainer !== range.endContainer) {
-    try {
-      range.setStart(e.node, e.offset)
-      range.setEnd(s.node, s.offset)
-    } catch {
-      return null
-    }
-  }
   return range
+}
+
+/** DOM 上で a が b より前にあるか。 */
+function isBefore(a: DomPoint, b: DomPoint): boolean {
+  if (a.node === b.node) return a.offset < b.offset
+  const rel = a.node.compareDocumentPosition(b.node)
+  return (rel & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
 }
 
 /** Block 要素そのものを取得する。 */

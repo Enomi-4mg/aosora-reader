@@ -182,3 +182,31 @@ describe('要素境界を指す DOM 点', () => {
     )
   })
 })
+
+describe('逆転した TextRange', () => {
+  it('start > end でも入れ替えて解決する', () => {
+    const { block } = render('あいうえお')
+    const at = (offset: number) => ({
+      bookId: BOOK,
+      chapterId: 'c0',
+      blockId: block.id,
+      offset
+    })
+    const range = textRangeToDomRange({ start: at(4), end: at(1) }, document)
+    expect(range).not.toBeNull()
+    expect(range!.collapsed).toBe(false)
+    expect(range!.toString()).toBe('いうえ')
+  })
+
+  it('正順の範囲はそのまま解決する', () => {
+    const { block } = render('あいうえお')
+    const at = (offset: number) => ({
+      bookId: BOOK,
+      chapterId: 'c0',
+      blockId: block.id,
+      offset
+    })
+    expect(textRangeToDomRange({ start: at(1), end: at(4) }, document)!.toString())
+      .toBe('いうえ')
+  })
+})
