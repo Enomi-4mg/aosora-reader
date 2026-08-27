@@ -1,0 +1,13 @@
+appId: jp.miyashu.aosora-reader
+productName: 青空Reader
+directories:
+  output: dist
+  buildResources: resources
+files:
+  - out/**
+  - package.json
+mac:
+  target:
+    - dmg
+  category: public.app-category.book
+  darkModeSupport: true

@@ -1,0 +1,77 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; font-family: "Hiragino Mincho ProN", serif; }
+  .viewport { position: relative; overflow: hidden; border: 1px solid #333; }
+  .content { column-fill: auto; column-gap: 40px; font-size: 18px; line-height: 1.8; }
+  .v { writing-mode: vertical-rl; }
+  .h { writing-mode: horizontal-tb; }
+  ::highlight(spike) { background: gold; }
+</style>
+<div id="stage"></div>
+<script>
+const SAMPLE = '吾輩は猫である。名前はまだ無い。どこで生れたか頓と見当がつかぬ。'.repeat(40)
+
+function build(mode, cols, W, H) {
+  const vp = document.createElement('div')
+  vp.className = 'viewport'
+  vp.style.width = W + 'px'
+  vp.style.height = H + 'px'
+  const c = document.createElement('div')
+  c.className = 'content ' + mode
+  c.style.columnCount = String(cols)
+  // インライン軸サイズを viewport に固定する
+  if (mode === 'v') { c.style.height = H + 'px'; c.style.width = W + 'px' }
+  else { c.style.width = W + 'px'; c.style.height = H + 'px' }
+  c.innerHTML = '<p><ruby>吾輩<rt>わがはい</rt></ruby>は猫である。</p><p id="probe-host">'
+    + SAMPLE.slice(0, 200) + '<span id="probe">【目印】</span>' + SAMPLE + '</p>'
+  vp.appendChild(c)
+  document.getElementById('stage').appendChild(vp)
+  return { vp, c }
+}
+
+window.__runSpike = () => {
+  const W = 600, H = 400, GAP = 40
+  const out = {}
+
+  for (const [label, mode, cols] of [
+    ['vertical-1col', 'v', 1],
+    ['vertical-2col', 'v', 2],
+    ['horizontal-1col', 'h', 1],
+    ['horizontal-2col', 'h', 2]
+  ]) {
+    const { vp, c } = build(mode, cols, W, H)
+    const inlineAxis = mode === 'v' ? 'Y' : 'X'
+    const overflowY = c.scrollHeight - H
+    const overflowX = c.scrollWidth - W
+    // 目印 span がどこに配置されたか（ページ導出の可否）
+    const probe = c.querySelector('#probe').getBoundingClientRect()
+    const base = c.getBoundingClientRect()
+    out[label] = {
+      expectedInlineAxis: inlineAxis,
+      scrollWidth: c.scrollWidth, scrollHeight: c.scrollHeight,
+      overflowX, overflowY,
+      overflowsAlong: overflowY > overflowX ? 'Y' : (overflowX > overflowY ? 'X' : 'none'),
+      probeOffsetX: Math.round(probe.left - base.left),
+      probeOffsetY: Math.round(probe.top - base.top),
+      rubyRendered: !!c.querySelector('ruby rt')
+    }
+    vp.remove()
+  }
+
+  // CSS Custom Highlight API
+  let hl = 'unsupported'
+  try {
+    if (window.CSS && CSS.highlights && typeof Highlight === 'function') {
+      const { c } = build('v', 1, W, H)
+      const tn = c.querySelector('#probe').firstChild
+      const r = document.createRange(); r.setStart(tn, 0); r.setEnd(tn, 2)
+      CSS.highlights.set('spike', new Highlight(r))
+      hl = CSS.highlights.has('spike') ? 'ok' : 'set-failed'
+    }
+  } catch (e) { hl = 'error: ' + e.message }
+  out.cssCustomHighlight = hl
+  out.chrome = navigator.userAgent.match(/Chrome\/[\d.]+/)?.[0]
+  return out
+}
+</script>

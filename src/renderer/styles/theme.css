@@ -1,0 +1,97 @@
+/*
+ * テーマ(要件 §4.8)。
+ * light / sepia / dark を CSS 変数で切り替え、system は prefers-color-scheme に追従する。
+ * ハイライトの実表示色もここで決める。内部では固定の色名(yellow/green/blue/red)で
+ * 管理し、見え方だけをテーマごとに調整する(要件 §5.2)。
+ */
+
+:root {
+  --bg: #fbfbfa;
+  --fg: #1c1b19;
+  --secondary: #6b6660;
+  --border: #e2ded7;
+  --surface: #ffffff;
+  --surface-hover: #f1efeb;
+  --accent: #7a5c3e;
+  --selection: rgba(122, 92, 62, 0.22);
+
+  --hl-yellow: rgba(255, 214, 92, 0.5);
+  --hl-green: rgba(140, 214, 148, 0.45);
+  --hl-blue: rgba(130, 187, 240, 0.45);
+  --hl-red: rgba(244, 148, 148, 0.45);
+  --hl-search: rgba(255, 186, 60, 0.55);
+  --hl-search-current: rgba(255, 140, 0, 0.75);
+  --hl-tts: rgba(120, 180, 255, 0.35);
+}
+
+:root[data-theme='sepia'] {
+  --bg: #f4ecd8;
+  --fg: #43382a;
+  --secondary: #7d6b52;
+  --border: #ddd0b4;
+  --surface: #faf3e3;
+  --surface-hover: #ece0c6;
+  --accent: #8a6538;
+  --selection: rgba(138, 101, 56, 0.24);
+}
+
+:root[data-theme='dark'] {
+  --bg: #16181c;
+  --fg: #d9d5cd;
+  --secondary: #8d8880;
+  --border: #2c2f36;
+  --surface: #1d2026;
+  --surface-hover: #262a32;
+  --accent: #c9a87a;
+  --selection: rgba(201, 168, 122, 0.28);
+
+  --hl-yellow: rgba(214, 176, 60, 0.38);
+  --hl-green: rgba(96, 176, 108, 0.34);
+  --hl-blue: rgba(92, 148, 208, 0.36);
+  --hl-red: rgba(206, 106, 106, 0.36);
+  --hl-search: rgba(214, 150, 40, 0.45);
+  --hl-search-current: rgba(255, 150, 30, 0.68);
+  --hl-tts: rgba(100, 150, 220, 0.3);
+}
+
+/* system: OS 設定に追従する。明示指定(data-theme)があるときは無効。 */
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='system'] {
+    --bg: #16181c;
+    --fg: #d9d5cd;
+    --secondary: #8d8880;
+    --border: #2c2f36;
+    --surface: #1d2026;
+    --surface-hover: #262a32;
+    --accent: #c9a87a;
+    --selection: rgba(201, 168, 122, 0.28);
+
+    --hl-yellow: rgba(214, 176, 60, 0.38);
+    --hl-green: rgba(96, 176, 108, 0.34);
+    --hl-blue: rgba(92, 148, 208, 0.36);
+    --hl-red: rgba(206, 106, 106, 0.36);
+    --hl-search: rgba(214, 150, 40, 0.45);
+    --hl-search-current: rgba(255, 150, 30, 0.68);
+    --hl-tts: rgba(100, 150, 220, 0.3);
+  }
+}
+
+::selection {
+  background: var(--selection);
+}
+
+/*
+ * ハイライト描画は CSS Custom Highlight API に集約する。
+ * multicolumn + transform の座標系で絶対配置オーバーレイを自前計算すると破綻するため、
+ * ハイライト・検索一致・読み上げ中の文をすべてこの仕組みで塗る。
+ */
+::highlight(aozora-yellow) { background-color: var(--hl-yellow); }
+::highlight(aozora-green)  { background-color: var(--hl-green); }
+::highlight(aozora-blue)   { background-color: var(--hl-blue); }
+::highlight(aozora-red)    { background-color: var(--hl-red); }
+::highlight(aozora-search) { background-color: var(--hl-search); }
+::highlight(aozora-search-current) {
+  background-color: var(--hl-search-current);
+  color: #14110c;
+}
+::highlight(aozora-tts) { background-color: var(--hl-tts); }

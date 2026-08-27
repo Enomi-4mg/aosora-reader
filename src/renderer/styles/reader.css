@@ -1,0 +1,308 @@
+/*
+ * Reader のレイアウト。
+ *
+ * 【不変条件 B】インライン軸サイズを viewport に固定すると、CSS multicolumn は
+ * インライン軸方向にあふれる。縦書き(vertical-rl)ならインライン軸は Y、
+ * 横書き(horizontal-tb)なら X。LayoutController はその1軸だけを動かす。
+ * (M0 スパイクで Chromium 152 上で実測済み)
+ */
+
+.reader {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  block-size: 100%;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 14px;
+  padding-block-start: 30px;
+  border-block-end: 1px solid var(--border);
+  -webkit-app-region: drag;
+}
+.toolbar > * { -webkit-app-region: no-drag; }
+.toolbar-title {
+  flex: 1;
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  justify-content: center;
+  font-size: 13px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.reader-body { display: flex; min-block-size: 0; }
+
+.sidebar {
+  inline-size: 250px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  border-inline-end: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.reader-stage { position: relative; flex: 1; min-inline-size: 0; }
+
+/* 集中モード(要件 §5.12) */
+.reader.focus .toolbar,
+.reader.focus .sidebar { display: none; }
+.reader.focus .status { opacity: 0.35; }
+
+.status {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 6px 16px;
+  font-size: 12px;
+  color: var(--secondary);
+  border-block-start: 1px solid var(--border);
+}
+.status-progress { margin-inline-start: auto; }
+
+/* ---------- 本文ビューポート ---------- */
+
+.viewport {
+  position: absolute;
+  inset: 0;
+  padding: var(--page-margin);
+  overflow: hidden;
+
+  font-family: var(--font-family);
+  font-size: var(--font-size);
+  font-weight: var(--font-weight);
+  line-height: var(--line-height);
+  letter-spacing: var(--letter-spacing);
+}
+
+.content {
+  column-count: var(--column-count);
+  column-gap: calc(var(--font-size) * 2.2);
+  column-fill: auto;
+  will-change: transform;
+}
+
+/* 縦書き: インライン軸 = Y。高さを viewport に固定すると列は下方向へあふれる。 */
+.viewport.wm-vertical { writing-mode: vertical-rl; text-orientation: mixed; }
+.viewport.wm-vertical .content {
+  block-size: 100%;
+  inline-size: 100%;
+}
+
+/* 横書き: インライン軸 = X。 */
+.viewport.wm-horizontal { writing-mode: horizontal-tb; }
+.viewport.wm-horizontal .content {
+  block-size: 100%;
+  inline-size: 100%;
+}
+
+/*
+ * 連続スクロール時は transform を使わず、ネイティブスクロールに任せる。
+ *
+ * block-size を auto にするだけで縦横どちらも正しくなる:
+ *   縦書き(vertical-rl) → block-size = 横方向 → 幅が伸びて水平スクロール
+ *   横書き(horizontal-tb) → block-size = 縦方向 → 高さが伸びて垂直スクロール
+ * inline-size は 100% のままにして、行の長さを viewport に合わせる。
+ */
+.viewport.mode-scroll { overflow: auto; }
+.viewport.mode-scroll .content {
+  column-count: 1;
+  transform: none !important;
+  transition: none !important;
+  block-size: auto;
+  inline-size: 100%;
+}
+
+/* ページ送り用のクリック領域。縦書きでは論理方向に合わせて左右が入れ替わる。 */
+.page-zone {
+  position: absolute;
+  inline-size: 12%;
+  min-inline-size: 40px;
+  inset-block: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+.page-zone:hover { background: var(--surface-hover); opacity: 0.35; }
+/*
+ * 次ページの向きは組み方で変わる。
+ * 横書き: 次 = 右 / 縦書き: 次 = 左(右から左へ読み進めるため)。
+ * 論理操作 next/previous 自体は共通で、当たり判定の位置だけを入れ替える。
+ */
+.reader-stage:has(.wm-horizontal) > .page-zone.next { inset-inline-end: 0; }
+.reader-stage:has(.wm-horizontal) > .page-zone.prev { inset-inline-start: 0; }
+.reader-stage:has(.wm-vertical) > .page-zone.next { inset-inline-start: 0; }
+.reader-stage:has(.wm-vertical) > .page-zone.prev { inset-inline-end: 0; }
+.reader-stage:has(.mode-scroll) > .page-zone { display: none; }
+
+/* ---------- 本文の組版 ---------- */
+
+.blk { margin: 0; }
+.para { text-indent: 0; margin-block-end: var(--paragraph-spacing); }
+.empty { block-size: 1em; }
+
+.head { font-weight: 600; }
+.head-1 { font-size: 1.5em; margin-block: 2em 1.2em; }
+.head-2 { font-size: 1.25em; margin-block: 1.6em 0.9em; }
+.head-3 { font-size: 1.1em; margin-block: 1.2em 0.7em; }
+
+.page-break { break-after: column; block-size: 0; }
+.rule { border: none; border-block-start: 1px solid var(--border); margin-block: 1.5em; }
+
+.image { margin-block: 1em; }
+.image-placeholder {
+  display: inline-block;
+  padding: 0.6em 1em;
+  color: var(--secondary);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  font-size: 0.85em;
+}
+
+/* ルビ */
+ruby { ruby-align: center; }
+rt { font-size: 0.5em; letter-spacing: 0; opacity: 0.85; }
+
+/* 傍点(要件 §4.2)。縦書きでは右側、横書きでは上側に付く。 */
+.em { text-emphasis-position: over right; }
+.em-sesame { text-emphasis: filled sesame; }
+.em-white-sesame { text-emphasis: open sesame; }
+.em-dot { text-emphasis: filled dot; }
+.em-white-dot { text-emphasis: open dot; }
+.em-double-dot { text-emphasis: double-circle; }
+.em-bullseye { text-emphasis: filled double-circle; }
+.em-triangle { text-emphasis: filled triangle; }
+.em-white-triangle { text-emphasis: open triangle; }
+.em-x { text-emphasis: filled sesame; }
+
+.bold { font-weight: 700; }
+
+.ul { text-decoration-line: underline; text-underline-offset: 0.28em; }
+.ul-solid { text-decoration-style: solid; }
+.ul-double { text-decoration-style: double; }
+.ul-dotted { text-decoration-style: dotted; }
+.ul-dashed { text-decoration-style: dashed; }
+.ul-wave { text-decoration-style: wavy; }
+
+/* 縦中横 */
+.tcy { text-combine-upright: all; }
+
+/* ゼロ幅の未対応注記。座標を一切消費させない。 */
+.note { display: none; }
+
+/* 解決できなかった外字を目立たせる(本文は止めない) */
+[data-gaiji='placeholder'] { color: var(--secondary); }
+
+.wrap { display: contents; }
+
+/* ---------- パネル ---------- */
+
+.panel { padding: 14px; }
+.panel-title { margin: 0 0 10px; font-size: 12px; letter-spacing: 0.1em; color: var(--secondary); }
+.panel-empty { padding: 14px; color: var(--secondary); }
+
+.toc { list-style: none; margin: 0; padding: 0; }
+.toc-item button {
+  inline-size: 100%;
+  text-align: start;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+.toc-item.lv-2 button { padding-inline-start: 20px; font-size: 12.5px; }
+.toc-item.lv-3 button { padding-inline-start: 32px; font-size: 12px; }
+.toc-item.current button { background: var(--surface-hover); font-weight: 600; color: var(--accent); }
+
+/* ---------- 検索 ---------- */
+
+.search-overlay {
+  position: absolute;
+  inset-block-start: 46px;
+  inset-inline-end: 16px;
+  inline-size: min(400px, calc(100vw - 32px));
+  max-block-size: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+  z-index: 30;
+}
+.search-head { display: flex; gap: 6px; align-items: center; padding: 10px; }
+.search-head input { flex: 1; }
+.search-head .count { font-size: 12px; color: var(--secondary); white-space: nowrap; }
+
+.search-results {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px 8px;
+  overflow-y: auto;
+}
+.search-results button {
+  inline-size: 100%;
+  text-align: start;
+  background: transparent;
+  border: none;
+  padding: 7px 8px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  /* 抜粋は「前 / 一致 / 後」の順に見せる */
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.search-results button.current { background: var(--surface-hover); }
+.search-results mark { background: var(--hl-search); color: inherit; order: 2; }
+.ctx-before { order: 1; color: var(--secondary); }
+.ctx-after { order: 3; color: var(--secondary); }
+
+/* ---------- 設定 ---------- */
+
+.settings-overlay {
+  position: absolute;
+  inset-block-start: 46px;
+  inset-inline-end: 16px;
+  inline-size: min(340px, calc(100vw - 32px));
+  max-block-size: 78vh;
+  overflow-y: auto;
+  padding: 4px 16px 18px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+  z-index: 30;
+}
+.settings-head {
+  position: sticky;
+  inset-block-start: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-block: 12px;
+  background: var(--bg);
+}
+.settings-head h2 { margin: 0; font-size: 15px; }
+.settings-overlay section { margin-block-end: 18px; }
+.settings-overlay h3 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--secondary);
+}
+.settings-overlay .seg { margin-block-end: 8px; inline-size: 100%; }
+.settings-overlay .seg button { flex: 1; }
+.settings-overlay label { display: flex; gap: 8px; align-items: center; margin-block-end: 8px; font-size: 13px; }
+.settings-overlay label select { flex: 1; }
+.range span { inline-size: 70px; flex-shrink: 0; }
+.range input { flex: 1; }
+.range output { inline-size: 56px; text-align: end; color: var(--secondary); font-size: 12px; }
+.theme-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
