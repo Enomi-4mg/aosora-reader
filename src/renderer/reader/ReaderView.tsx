@@ -30,6 +30,14 @@ import { estimateRemainingMinutes, formatReadingTime } from '@shared/reading'
 import type { DictionaryResult, ReadingStats } from '@shared/model/annotations'
 import { ReaderContextMenu } from './ReaderContextMenu'
 import type { TextPosition } from '@shared/model/position'
+import {
+  ArrowLeftIcon,
+  Cog6ToothIcon,
+  ListBulletIcon,
+  MagnifyingGlassIcon,
+  PencilSquareIcon
+} from '@heroicons/react/24/outline'
+import { ToolbarButton } from '../components/ToolbarButton'
 
 interface Props {
   onBackToLibrary: () => void
@@ -519,14 +527,29 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
         * 栞・著者・集中・全画面は設定パネルへ集約した。
         */}
       <header className="toolbar">
-        <button className="ghost home" onClick={onBackToLibrary}>← 本棚</button>
-        <button className="ghost" onClick={() => {
-          if (store.sidebarOpen && store.sidebarTab === 'contents') store.toggleSidebar()
-          else store.setSidebarTab('contents')
-        }} aria-expanded={store.sidebarOpen}>
-          目次
-        </button>
-        <button className="ghost" onClick={() => store.setSidebarTab('annotations')} aria-label="注釈一覧">注釈</button>
+        <div className="toolbar-group">
+          <ToolbarButton
+            tone="exit"
+            label="本棚へ戻る"
+            icon={<ArrowLeftIcon className="icon" />}
+            onClick={onBackToLibrary}
+          />
+          <ToolbarButton
+            label="目次"
+            icon={<ListBulletIcon className="icon" />}
+            expanded={store.sidebarOpen && store.sidebarTab === 'contents'}
+            onClick={() => {
+              if (store.sidebarOpen && store.sidebarTab === 'contents') store.toggleSidebar()
+              else store.setSidebarTab('contents')
+            }}
+          />
+          <ToolbarButton
+            label="注釈一覧"
+            icon={<PencilSquareIcon className="icon" />}
+            expanded={store.sidebarOpen && store.sidebarTab !== 'contents'}
+            onClick={() => store.setSidebarTab('annotations')}
+          />
+        </div>
         {store.searchOpen ? (
           <SearchPanel onJump={goToPosition} />
         ) : (
@@ -535,17 +558,22 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
             {store.book.author && <button className="author-link" onClick={() => setAuthorOpen(true)}>{store.book.author}</button>}
           </div>
         )}
-        {!store.searchOpen && (
-          <button className="ghost" onClick={store.openSearch} aria-label="本文を検索">検索</button>
-        )}
-        <TtsControls controller={tts} />
-        <button
-          className="ghost"
-          onClick={() => store.setSettingsOpen(!store.settingsOpen)}
-          aria-label="表示設定"
-        >
-          設定
-        </button>
+        <div className="toolbar-group">
+          {!store.searchOpen && (
+            <ToolbarButton
+              label="本文を検索"
+              icon={<MagnifyingGlassIcon className="icon" />}
+              onClick={store.openSearch}
+            />
+          )}
+          <TtsControls controller={tts} />
+          <ToolbarButton
+            label="表示設定"
+            icon={<Cog6ToothIcon className="icon" />}
+            pressed={store.settingsOpen}
+            onClick={() => store.setSettingsOpen(!store.settingsOpen)}
+          />
+        </div>
         {store.settingsOpen && (
           <SettingsPanel
             onClose={() => store.setSettingsOpen(false)}

@@ -33,10 +33,6 @@
   overflow: hidden;
   white-space: nowrap;
 }
-/* 本棚へ戻るのは読書からの離脱。他のツールバー項目と役割が違うので色を分ける。 */
-.toolbar .home { color: var(--exit); }
-.toolbar .home:hover { background: var(--exit-surface); color: var(--exit); }
-
 .author-link { padding: 0; color: var(--secondary); background: transparent; border: 0; font-size: 12px; }
 .author-link:hover { color: var(--accent); background: transparent; text-decoration: underline; }
 
@@ -432,8 +428,15 @@ rt {
 .swatch.blue { background: #6b9fce; }
 .swatch.red { background: #c97670; }
 
-.tts-controls { display: flex; align-items: center; border-inline: 1px solid var(--border); }
-.tts-controls button { padding-inline: 6px; }
+/* 読み上げは1つのまとまりとして扱うので、前後を区切って隣と分ける。 */
+.tts-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-inline: 6px;
+  margin-inline: 2px;
+  border-inline: 1px solid var(--border);
+}
 
 .dictionary-popover,
 .author-popover {

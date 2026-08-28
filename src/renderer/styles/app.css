@@ -35,6 +35,55 @@ button:disabled { opacity: 0.5; cursor: default; }
   outline-offset: 2px;
 }
 
+/*
+ * ツールバーのアイコンボタン。
+ *
+ * ラベルは hover / focus のときだけツールチップで出す。
+ * aria-label は常に付いているので、名前が消えるのは見た目だけ。
+ */
+.tool-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 30px;
+  block-size: 28px;
+  padding: 0;
+  color: var(--secondary);
+  background: transparent;
+  border-color: transparent;
+}
+.tool-button:hover { color: var(--fg); background: var(--surface-hover); }
+.tool-button.on { color: #fff; background: var(--accent); }
+.tool-button.tone-exit { color: var(--exit); }
+.tool-button.tone-exit:hover { color: var(--exit); background: var(--exit-surface); }
+.tool-button:disabled { background: transparent; }
+.tool-button .icon { inline-size: 18px; block-size: 18px; stroke-width: 1.7; }
+
+.tool-button::after {
+  content: attr(data-tip);
+  position: absolute;
+  inset-block-start: calc(100% + 7px);
+  inset-inline-start: 50%;
+  z-index: 40;
+  padding: 3px 7px;
+  color: var(--bg);
+  font-size: 11px;
+  white-space: nowrap;
+  background: var(--fg);
+  border-radius: 5px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+  /* 通りすがりに出さないよう、少し待ってから表示する。 */
+  transition: opacity 110ms ease 320ms;
+}
+.tool-button:hover::after,
+.tool-button:focus-visible::after { opacity: 1; }
+
+/* 役割の近いボタンをひとかたまりに見せる。 */
+.toolbar-group { display: flex; align-items: center; gap: 2px; }
+
 input, select {
   font: inherit;
   color: inherit;
