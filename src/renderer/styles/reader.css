@@ -161,7 +161,13 @@
   min-block-size: 100%;
 }
 
-/* ページ送り用のクリック領域。縦書きでは論理方向に合わせて左右が入れ替わる。 */
+/*
+ * ページ送り用のクリック領域。縦書きでは論理方向に合わせて左右が入れ替わる。
+ *
+ * pointer-events は取らない。ここで受けてしまうと帯の下にある本文を
+ * 選択も caret 配置もできなくなる。マウスのページ送りは reader-stage 側で
+ * 座標から判定し、この要素は見た目とキーボード操作のためだけに残す。
+ */
 .page-zone {
   position: absolute;
   inline-size: 12%;
@@ -170,11 +176,11 @@
   background: transparent;
   border: none;
   border-radius: 0;
-  cursor: pointer;
   z-index: 2;
-  touch-action: pan-y;
+  pointer-events: none;
 }
-.page-zone:hover { background: var(--surface-hover); opacity: 0.35; }
+/* hover 相当。pointer-events が無いので :hover ではなく JS が付ける。 */
+.page-zone.hot { background: var(--surface-hover); opacity: 0.35; }
 /*
  * 次ページの向きは組み方で変わる。
  * 横書き: 次 = 右 / 縦書き: 次 = 左(右から左へ読み進めるため)。

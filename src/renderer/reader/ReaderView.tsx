@@ -36,6 +36,26 @@ interface Props {
   onOpenBook?: (bookId: string) => void
 }
 
+/** ページ送りの帯の幅。reader.css の .page-zone と同じ値。 */
+const EDGE_RATIO = 0.12
+const EDGE_MIN_PX = 40
+
+type EdgeZone = 'prev' | 'next'
+
+/**
+ * クリック位置がページ送りの帯に入っているか。
+ *
+ * 帯を要素で受けると下の本文を選択できなくなるので、当たり判定は座標で持つ。
+ * 縦書きは右から左へ読むため、次ページが左側にある。
+ */
+function edgeZoneAt(stage: HTMLElement, clientX: number, vertical: boolean): EdgeZone | null {
+  const r = stage.getBoundingClientRect()
+  const band = Math.max(EDGE_MIN_PX, r.width * EDGE_RATIO)
+  if (clientX - r.left <= band) return vertical ? 'next' : 'prev'
+  if (r.right - clientX <= band) return vertical ? 'prev' : 'next'
+  return null
+}
+
 export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element {
   const store = useReaderStore()
   const { settings } = useSettingsStore()
@@ -49,6 +69,8 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
   const swipe = useRef({ pointerId: -1, startX: 0, startY: 0, moved: false })
   const suppressPageClick = useRef(false)
   const [dragging, setDragging] = useState(false)
+  /** ページ送りの帯にポインタが乗っているか。.page-zone の hover 表示に使う。 */
+  const [edgeHover, setEdgeHover] = useState<EdgeZone | null>(null)
   const [selection, setSelection] = useState<SelectionState | null>(null)
   const [dictionaryResult, setDictionaryResult] = useState<DictionaryResult | null>(null)
   const [dictionaryLoading, setDictionaryLoading] = useState(false)
@@ -370,6 +392,12 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
   }
 
   const onPointerMove = (event: React.PointerEvent<HTMLElement>): void => {
+    const zone =
+      settings.readingMode === 'pagination'
+        ? edgeZoneAt(event.currentTarget, event.clientX, settings.writingMode === 'vertical')
+        : null
+    if (zone !== edgeHover) setEdgeHover(zone)
+
     const gesture = swipe.current
     if (gesture.pointerId !== event.pointerId) return
     const dx = event.clientX - gesture.startX
@@ -379,6 +407,23 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
       event.currentTarget.setPointerCapture(event.pointerId)
       setDragging(true)
     }
+  }
+
+  /**
+   * 帯のクリックでページを送る。
+   *
+   * 帯そのものに当たり判定を持たせると本文を選択できなくなるので、
+   * ここで座標から判定する。選択が残っているときは送らない
+   * (本文をなぞり終えたクリックでページが飛ぶのを防ぐ)。
+   */
+  const onStageClick = (event: React.MouseEvent<HTMLElement>): void => {
+    if (settings.readingMode !== 'pagination') return
+    if (suppressPageClick.current) return
+    const native = window.getSelection()
+    if (native && !native.isCollapsed) return
+    const zone = edgeZoneAt(event.currentTarget, event.clientX, settings.writingMode === 'vertical')
+    if (zone === 'next') next()
+    else if (zone === 'prev') previous()
   }
 
   const finishSwipe = (event: React.PointerEvent<HTMLElement>): void => {
@@ -533,8 +578,10 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
           className={`reader-stage ${dragging ? 'dragging' : ''}`}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
+          onPointerLeave={() => setEdgeHover(null)}
           onPointerUp={finishSwipe}
           onPointerCancel={finishSwipe}
+          onClick={onStageClick}
           onContextMenu={(event) => {
             event.preventDefault()
             const text = window.getSelection()?.toString().trim() ?? ''
@@ -584,8 +631,17 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
             </div>
           </div>
 
-          <button className="page-zone prev" onClick={() => pageClick(previous)} aria-label="前のページ" />
-          <button className="page-zone next" onClick={() => pageClick(next)} aria-label="次のページ" />
+          {/* マウスの当たり判定は reader-stage 側。ここはキーボード操作と見た目のため。 */}
+          <button
+            className={`page-zone prev ${edgeHover === 'prev' ? 'hot' : ''}`}
+            onClick={() => pageClick(previous)}
+            aria-label="前のページ"
+          />
+          <button
+            className={`page-zone next ${edgeHover === 'next' ? 'hot' : ''}`}
+            onClick={() => pageClick(next)}
+            aria-label="次のページ"
+          />
         </main>
       </div>
 
