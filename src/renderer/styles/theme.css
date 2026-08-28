@@ -14,6 +14,9 @@
   --surface-hover: #f1efeb;
   --accent: #7a5c3e;
   --selection: rgba(122, 92, 62, 0.22);
+  /* 読書から抜ける操作(本棚へ戻る)。各テーマの背景に対し AA を満たす赤。 */
+  --exit: #b4443c;
+  --exit-surface: rgba(180, 68, 60, 0.1);
 
   --hl-yellow: rgba(255, 214, 92, 0.5);
   --hl-green: rgba(140, 214, 148, 0.45);
@@ -35,6 +38,8 @@
   --surface-hover: #ece0c6;
   --accent: #8a6538;
   --selection: rgba(138, 101, 56, 0.24);
+  --exit: #a03a33;
+  --exit-surface: rgba(160, 58, 51, 0.1);
 }
 
 :root[data-theme='dark'] {
@@ -46,6 +51,8 @@
   --surface-hover: #262a32;
   --accent: #c9a87a;
   --selection: rgba(201, 168, 122, 0.28);
+  --exit: #e08b84;
+  --exit-surface: rgba(224, 139, 132, 0.14);
 
   --hl-yellow: rgba(214, 176, 60, 0.38);
   --hl-green: rgba(96, 176, 108, 0.34);
@@ -67,6 +74,8 @@
     --surface-hover: #262a32;
     --accent: #c9a87a;
     --selection: rgba(201, 168, 122, 0.28);
+    --exit: #e08b84;
+    --exit-surface: rgba(224, 139, 132, 0.14);
 
     --hl-yellow: rgba(214, 176, 60, 0.38);
     --hl-green: rgba(96, 176, 108, 0.34);

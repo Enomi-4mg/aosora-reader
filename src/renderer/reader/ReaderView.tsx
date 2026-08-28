@@ -447,8 +447,13 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
       }}
       onClick={() => setContextMenu(null)}
     >
+      {/*
+        * ツールバーに出すのは、読んでいる最中に押すものだけに絞る。
+        * 左は移動(本棚・目次・注釈)、右は検索と読み上げ。
+        * 栞・著者・集中・全画面は設定パネルへ集約した。
+        */}
       <header className="toolbar">
-        <button className="ghost" onClick={onBackToLibrary}>← 本棚</button>
+        <button className="ghost home" onClick={onBackToLibrary}>← 本棚</button>
         <button className="ghost" onClick={() => {
           if (store.sidebarOpen && store.sidebarTab === 'contents') store.toggleSidebar()
           else store.setSidebarTab('contents')
@@ -475,11 +480,26 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
         >
           設定
         </button>
-        <button className="ghost" onClick={addBookmark} aria-label="現在位置に栞を追加">栞</button>
-        <button className="ghost" onClick={() => setAuthorOpen(!authorOpen)} aria-label="著者情報">著者</button>
-        <button className="ghost" onClick={() => store.setFocusMode(!store.focusMode)} aria-pressed={store.focusMode}>集中</button>
-        <button className="ghost" onClick={toggleFullscreen} aria-pressed={fullscreen}>全画面</button>
-        {store.settingsOpen && <SettingsPanel onClose={() => store.setSettingsOpen(false)} />}
+        {store.settingsOpen && (
+          <SettingsPanel
+            onClose={() => store.setSettingsOpen(false)}
+            reader={{
+              focusMode: store.focusMode,
+              fullscreen,
+              hasAuthor: store.book.author !== null,
+              onToggleFocus: () => store.setFocusMode(!store.focusMode),
+              onToggleFullscreen: toggleFullscreen,
+              onAddBookmark: () => {
+                addBookmark()
+                store.setSettingsOpen(false)
+              },
+              onShowAuthor: () => {
+                store.setSettingsOpen(false)
+                setAuthorOpen(true)
+              }
+            }}
+          />
+        )}
         {authorOpen && <AuthorPopover book={store.book} onOpenBook={onOpenBook} onClose={() => setAuthorOpen(false)} />}
       </header>
 

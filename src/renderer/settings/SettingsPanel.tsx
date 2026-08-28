@@ -26,7 +26,27 @@ const THEMES: Array<[ThemeName, string]> = [
   ['dark', 'ダーク']
 ]
 
-export function SettingsPanel({ onClose }: { onClose: () => void }): JSX.Element {
+/**
+ * Reader 側の操作。ツールバーに常設せず設定へ集約したものを受け取る。
+ * SettingsPanel 自体は本の内容を知らないので、動作は呼び出し側から渡す。
+ */
+export interface ReaderControls {
+  focusMode: boolean
+  fullscreen: boolean
+  hasAuthor: boolean
+  onToggleFocus: () => void
+  onToggleFullscreen: () => void
+  onAddBookmark: () => void
+  onShowAuthor: () => void
+}
+
+export function SettingsPanel({
+  onClose,
+  reader
+}: {
+  onClose: () => void
+  reader?: ReaderControls
+}): JSX.Element {
   const { settings, patch, reset, error } = useSettingsStore()
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
   const [dataLocation, setDataLocation] = useState('')
@@ -51,6 +71,38 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): JSX.Element
       </div>
 
       {error && <p className="panel-error" role="alert">{error}</p>}
+
+      {reader && (
+        <>
+          <section>
+            <h3>この作品</h3>
+            <div className="settings-actions">
+              <button onClick={reader.onAddBookmark}>現在位置に栞を追加</button>
+              {reader.hasAuthor && <button onClick={reader.onShowAuthor}>著者情報</button>}
+            </div>
+          </section>
+
+          <section>
+            <h3>画面</h3>
+            <div className="seg" role="group" aria-label="画面">
+              <button
+                className={reader.focusMode ? 'on' : ''}
+                aria-pressed={reader.focusMode}
+                onClick={reader.onToggleFocus}
+              >
+                集中モード
+              </button>
+              <button
+                className={reader.fullscreen ? 'on' : ''}
+                aria-pressed={reader.fullscreen}
+                onClick={reader.onToggleFullscreen}
+              >
+                全画面
+              </button>
+            </div>
+          </section>
+        </>
+      )}
 
       <section>
         <h3>組み方</h3>

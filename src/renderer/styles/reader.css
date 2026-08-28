@@ -33,6 +33,10 @@
   overflow: hidden;
   white-space: nowrap;
 }
+/* 本棚へ戻るのは読書からの離脱。他のツールバー項目と役割が違うので色を分ける。 */
+.toolbar .home { color: var(--exit); }
+.toolbar .home:hover { background: var(--exit-surface); color: var(--exit); }
+
 .author-link { padding: 0; color: var(--secondary); background: transparent; border: 0; font-size: 12px; }
 .author-link:hover { color: var(--accent); background: transparent; text-decoration: underline; }
 
