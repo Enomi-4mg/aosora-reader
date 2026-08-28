@@ -212,6 +212,9 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
         pendingRestore.current = target
         store.setChapter(nextChapterIndex)
         if (target) store.setPosition(target)
+      } else {
+        // 巻末で「次へ」。ページは動かないが、読み終えたことは確定する。
+        syncPosition()
       }
       return
     }
@@ -237,9 +240,27 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
     syncPosition()
   }, [store.book, store.index, store.chapterIndex])
 
+  /**
+   * いま見えている位置をストアへ書き戻す。
+   *
+   * currentPosition() が返すのは「ページ先頭」の位置なので、最終ページに
+   * 着いてもその1ページぶんが読了率に乗らない。読み終えても 100% にならず
+   * 読了判定が出ないので、作品の最後のページに着いたら位置を巻末として扱う。
+   * 見えている以上そこまで読めているし、復元先としても最終ページになる。
+   */
   const syncPosition = useCallback(() => {
     if (restoring.current) return
-    const p = layoutRef.current?.currentPosition()
+    const l = layoutRef.current
+    if (!l) return
+    const { book, index, chapterIndex } = useReaderStore.getState()
+    if (book && index && chapterIndex === book.chapters.length - 1 && l.isAtEnd()) {
+      const end = chapterEndPosition(index, book.chapters[chapterIndex]!.id)
+      if (end) {
+        store.setPosition(end)
+        return
+      }
+    }
+    const p = l.currentPosition()
     if (p) store.setPosition(p)
   }, [])
 

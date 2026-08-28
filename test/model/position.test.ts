@@ -180,3 +180,24 @@ describe('補助', () => {
     expect(chapterEndPosition(index, 'missing')).toBeNull()
   })
 })
+
+describe('読了率の上限', () => {
+  it('最終章の巻末位置がちょうど 100% になる', () => {
+    const last = book.chapters[book.chapters.length - 1]!
+    const end = chapterEndPosition(index, last.id)!
+    expect(positionToCharOffset(index, end)).toBe(book.totalCharacters)
+    // 読了判定のしきい値(useProgressSaver の 0.995)を確実に超える
+    expect(positionToPercentage(index, end)).toBe(1)
+  })
+
+  it('末尾が空ブロックでも巻末位置は 100% になる', () => {
+    const withTrailingBlank = buildBook([
+      ['第一章', ['あいうえお']],
+      ['第二章', ['さしすせそ', '']]
+    ])
+    const blankIndex = buildBookIndex(withTrailingBlank)
+    const end = chapterEndPosition(blankIndex, 'c1')!
+    expect(end.blockId).toBe('c1_b1')
+    expect(positionToPercentage(blankIndex, end)).toBe(1)
+  })
+})
