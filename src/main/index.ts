@@ -56,6 +56,9 @@ function createWindow(): BrowserWindow {
     minWidth: 640,
     minHeight: 480,
     titleBarStyle: 'hiddenInset',
+    // 操作系は 52px のツールバー1段に収める(renderer の --titlebar-height)。
+    // 信号機ボタンをその中央に置き、タイトルバーと別の段にしない。
+    trafficLightPosition: { x: 19, y: 18 },
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#16181c' : '#fbfbfa',
     show: false,
     webPreferences: {

@@ -127,8 +127,10 @@ input, select {
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
-  padding: 10px 16px;
-  padding-block-start: 30px; /* macOS の hiddenInset タイトルバー分 */
+  min-block-size: var(--titlebar-height);
+  padding: 6px 14px;
+  /* 信号機ボタンと同じ段に並べる。左端はその幅ぶんだけ空ける。 */
+  padding-inline-start: var(--titlebar-inset);
   border-block-end: 1px solid var(--border);
   -webkit-app-region: drag;
 }
@@ -261,7 +263,8 @@ input, select {
 .catalog-work span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 @media (max-width: 900px) {
-  .library-bar { gap: 8px; padding-inline: 12px; }
+  /* 信号機ボタンは窓幅で縮まないので、左の余白だけは狭くしない。 */
+  .library-bar { gap: 8px; padding-inline: 12px; padding-inline-start: var(--titlebar-inset); }
   .search-input { min-inline-size: 180px; max-inline-size: none; }
   .shelf { padding: 14px; }
 }

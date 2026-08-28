@@ -6,6 +6,13 @@
  */
 
 :root {
+  /*
+   * macOS のツールバー。titleBarStyle: 'hiddenInset' でタイトルバーは消え、
+   * 信号機ボタンだけがこの帯に重なる。main の trafficLightPosition と対で調整する。
+   */
+  --titlebar-height: 52px;
+  --titlebar-inset: 84px;
+
   --bg: #fbfbfa;
   --fg: #1c1b19;
   --secondary: #6b6660;
@@ -85,6 +92,11 @@
     --hl-search-current: rgba(255, 150, 30, 0.68);
     --hl-tts: rgba(100, 150, 220, 0.3);
   }
+}
+
+/* 全画面では信号機ボタンが消えるので、ツールバー左の余白は要らない。 */
+:root[data-fullscreen='true'] {
+  --titlebar-inset: 12px;
 }
 
 ::selection {

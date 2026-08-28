@@ -11,14 +11,20 @@
   block-size: 100%;
 }
 
+/*
+ * 操作系はすべてこの1段に収める。macOS のツールバーとして扱うので、
+ * 信号機ボタンと同じ高さに並び、余白はそのぶんだけ左に取る。
+ * 全画面では信号機が消えるため、左の余白も外す(theme.css の data-fullscreen)。
+ */
 .toolbar {
   position: relative;
   z-index: 10;
   display: flex;
   gap: 8px;
   align-items: center;
-  padding: 8px 14px;
-  padding-block-start: 30px;
+  min-block-size: var(--titlebar-height);
+  padding: 6px 12px;
+  padding-inline-start: var(--titlebar-inset);
   border-block-end: 1px solid var(--border);
   -webkit-app-region: drag;
 }
@@ -586,7 +592,8 @@ rt {
 .settings-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 
 @media (max-width: 760px) {
-  .toolbar { gap: 4px; padding-inline: 8px; }
+  /* 信号機ボタンは窓幅で縮まないので、左の余白だけは狭くしない。 */
+  .toolbar { gap: 4px; padding-inline: 8px; padding-inline-start: var(--titlebar-inset); }
   .toolbar-title .muted { display: none; }
   .toolbar-search { min-inline-size: 0; }
   .search-head { gap: 3px; }

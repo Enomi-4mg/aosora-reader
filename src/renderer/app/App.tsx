@@ -5,12 +5,14 @@ import { useReaderStore } from '../state/useReaderStore'
 import { useSettingsStore } from '../state/useSettingsStore'
 import { useLibraryStore } from '../state/useLibraryStore'
 import { importablePathsFromFiles } from '../library/dropImport'
+import { useFullscreen } from '../hooks/useFullscreen'
 
 export function App(): JSX.Element {
   const { settings, loaded, load } = useSettingsStore()
   const reader = useReaderStore()
   const library = useLibraryStore()
   const [view, setView] = useState<'library' | 'reader'>('library')
+  const { fullscreen } = useFullscreen()
 
   useEffect(() => {
     void load()
@@ -20,6 +22,11 @@ export function App(): JSX.Element {
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme
   }, [settings.theme])
+
+  // 全画面では信号機ボタンが消えるので、ツールバー左の余白も外す。
+  useEffect(() => {
+    document.documentElement.dataset.fullscreen = String(fullscreen)
+  }, [fullscreen])
 
   // 本棚へのドラッグ&ドロップで取り込む
   useEffect(() => {

@@ -38,6 +38,7 @@ import {
   PencilSquareIcon
 } from '@heroicons/react/24/outline'
 import { ToolbarButton } from '../components/ToolbarButton'
+import { useFullscreen } from '../hooks/useFullscreen'
 
 interface Props {
   onBackToLibrary: () => void
@@ -85,7 +86,7 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
   const [dictionaryOpen, setDictionaryOpen] = useState(false)
   const [authorOpen, setAuthorOpen] = useState(false)
   const [readingStats, setReadingStats] = useState<ReadingStats | null>(null)
-  const [fullscreen, setFullscreen] = useState(false)
+  const { fullscreen, toggle: toggleFullscreen } = useFullscreen()
   const [focusAwake, setFocusAwake] = useState(false)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; text: string; position: TextPosition | null } | null>(null)
   /** 現在位置へのメモ入力。window.prompt は Electron で使えないので自前の UI で受ける。 */
@@ -367,12 +368,6 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
     void window.aozora.getReadingStats(store.book.id, settings.estimatedCharsPerMinute)
       .then(setReadingStats).catch(() => setReadingStats(null))
   }, [store.book?.id, settings.estimatedCharsPerMinute])
-
-  const toggleFullscreen = useCallback(() => {
-    void window.aozora.getFullscreen()
-      .then((current) => window.aozora.setFullscreen(!current))
-      .then(setFullscreen)
-  }, [])
 
   const closeTransient = useCallback((): boolean => {
     if (selection || dictionaryOpen || authorOpen || contextMenu || positionMemo) {
