@@ -39,7 +39,18 @@ export function useTtsController(args: {
   const stateRef = useRef(state)
   stateRef.current = state
 
+  /**
+   * いま有効な発話の世代。
+   *
+   * speechSynthesis.cancel() は読み上げ中の発話にも end / error を投げる。
+   * 文送りは「cancel してから次を speak する」ので、古い発話のイベントが
+   * 新しい発話の開始後に届き、idle に戻したり2文先へ飛ばしたりしていた。
+   * 世代が変わっている発話のイベントは、置き換え済みとして捨てる。
+   */
+  const generation = useRef(0)
+
   const speak = useCallback((at: number) => {
+    const token = ++generation.current
     if (!supported || !sentences[at]) { setState('idle'); setCursor(-1); return }
     const sentence = sentences[at]!
     window.speechSynthesis.cancel()
@@ -51,9 +62,14 @@ export function useTtsController(args: {
     utterance.volume = settings.ttsVolume
     utterance.lang = voice?.lang ?? 'ja-JP'
     utterance.onend = () => {
+      if (generation.current !== token) return
       if (stateRef.current === 'playing') speak(at + 1)
     }
-    utterance.onerror = () => { setState('idle'); setCursor(-1) }
+    utterance.onerror = () => {
+      if (generation.current !== token) return
+      setState('idle')
+      setCursor(-1)
+    }
     setCursor(at)
     setState('playing')
     onFollow(sentence.range.start)
@@ -66,7 +82,14 @@ export function useTtsController(args: {
     return found < 0 ? Math.max(0, sentences.length - 1) : found
   }, [position, index, sentences])
 
+  /** 文送りの基点。停止中は本文の現在位置から数える(先頭からではなく)。 */
+  const baseCursor = useCallback(
+    (): number => (cursorRef.current >= 0 ? cursorRef.current : positionCursor()),
+    [positionCursor]
+  )
+
   const stop = useCallback(() => {
+    generation.current++
     if (supported) window.speechSynthesis.cancel()
     setState('idle')
     setCursor(-1)
@@ -78,12 +101,12 @@ export function useTtsController(args: {
     state,
     currentRange: cursor >= 0 ? sentences[cursor]?.range ?? null : null,
     supported,
-    play: () => speak(cursorRef.current >= 0 ? cursorRef.current : positionCursor()),
+    play: () => speak(baseCursor()),
     pause: () => { if (supported) window.speechSynthesis.pause(); setState('paused') },
     resume: () => { if (supported) window.speechSynthesis.resume(); setState('playing') },
     stop,
-    nextSentence: () => speak(Math.min(sentences.length - 1, Math.max(0, cursorRef.current + 1))),
-    previousSentence: () => speak(Math.max(0, cursorRef.current - 1))
+    nextSentence: () => speak(Math.min(sentences.length - 1, baseCursor() + 1)),
+    previousSentence: () => speak(Math.max(0, baseCursor() - 1))
   }
 }
 
