@@ -56,6 +56,8 @@ interface ReaderState {
 
 /** 入力中に古い検索応答が戻ってきても、最新結果を上書きさせない。 */
 let latestSearchRequest = 0
+/** 作品切り替え・離脱後に届いた読み込み応答は反映しない。 */
+let latestOpenRequest = 0
 
 export const useReaderStore = create<ReaderState>((set, get) => ({
   book: null,
@@ -78,10 +80,12 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
   searchError: null,
 
   async open(bookId) {
+    const request = ++latestOpenRequest
     latestSearchRequest++
-    set({ loading: true, error: null })
+    set({ loading: true, error: null, searchQuery: '', searchResult: null, searchCursor: 0, searchError: null })
     try {
       const r = await window.aozora.openBook(bookId)
+      if (request !== latestOpenRequest) return
       if (!r) {
         set({ loading: false, error: '作品を開けませんでした。' })
         return
@@ -102,6 +106,7 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
         loading: false
       })
     } catch (e) {
+      if (request !== latestOpenRequest) return
       set({
         loading: false,
         error: e instanceof Error ? e.message : '作品を開けませんでした。'
@@ -110,9 +115,12 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
   },
 
   close() {
+    latestOpenRequest++
     latestSearchRequest++
     set({
       book: null,
+      loading: false,
+      error: null,
       index: null,
       position: null,
       chapterIndex: 0,
