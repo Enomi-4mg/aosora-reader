@@ -29,13 +29,15 @@ import { AuthorPopover } from '../panels/AuthorPopover'
 import { estimateRemainingMinutes, formatReadingTime } from '@shared/reading'
 import type { DictionaryResult, ReadingStats } from '@shared/model/annotations'
 import { ReaderContextMenu } from './ReaderContextMenu'
+import { ShareMenu } from './ShareMenu'
 import type { TextPosition } from '@shared/model/position'
 import {
   ArrowLeftIcon,
   Cog6ToothIcon,
   ListBulletIcon,
   MagnifyingGlassIcon,
-  PencilSquareIcon
+  PencilSquareIcon,
+  ShareIcon
 } from '@heroicons/react/24/outline'
 import { ToolbarButton } from '../components/ToolbarButton'
 import { useFullscreen } from '../hooks/useFullscreen'
@@ -85,6 +87,7 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
   const [dictionaryLoading, setDictionaryLoading] = useState(false)
   const [dictionaryOpen, setDictionaryOpen] = useState(false)
   const [authorOpen, setAuthorOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const [readingStats, setReadingStats] = useState<ReadingStats | null>(null)
   const { fullscreen, toggle: toggleFullscreen } = useFullscreen()
   const [focusAwake, setFocusAwake] = useState(false)
@@ -370,16 +373,17 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
   }, [store.book?.id, settings.estimatedCharsPerMinute])
 
   const closeTransient = useCallback((): boolean => {
-    if (selection || dictionaryOpen || authorOpen || contextMenu || positionMemo) {
+    if (selection || dictionaryOpen || authorOpen || shareOpen || contextMenu || positionMemo) {
       clearSelection()
       setDictionaryOpen(false)
       setAuthorOpen(false)
+      setShareOpen(false)
       setContextMenu(null)
       setPositionMemo(null)
       return true
     }
     return false
-  }, [selection, dictionaryOpen, authorOpen, contextMenu, positionMemo])
+  }, [selection, dictionaryOpen, authorOpen, shareOpen, contextMenu, positionMemo])
 
   useReaderKeyboard({
     next,
@@ -555,11 +559,34 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
         )}
         <div className="toolbar-group">
           {!store.searchOpen && (
-            <ToolbarButton
-              label="本文を検索"
-              icon={<MagnifyingGlassIcon className="icon" />}
-              onClick={store.openSearch}
-            />
+            <>
+              <ToolbarButton
+                label="本文を検索"
+                icon={<MagnifyingGlassIcon className="icon" />}
+                onClick={store.openSearch}
+              />
+              <div
+                className="share-control"
+                title={store.book.metadata.aozoraUrl ? undefined : '青空文庫の作品リンクがないため共有できません'}
+                onPointerDown={(event) => event.stopPropagation()}
+              >
+                <ToolbarButton
+                  label={store.book.metadata.aozoraUrl ? '作品を共有' : '青空文庫の作品リンクがないため共有できません'}
+                  icon={<ShareIcon className="icon" />}
+                  expanded={shareOpen}
+                  disabled={!store.book.metadata.aozoraUrl}
+                  onClick={() => setShareOpen((open) => !open)}
+                />
+                {shareOpen && store.book.metadata.aozoraUrl && (
+                  <ShareMenu
+                    title={store.book.title}
+                    author={store.book.author}
+                    url={store.book.metadata.aozoraUrl}
+                    onClose={() => setShareOpen(false)}
+                  />
+                )}
+              </div>
+            </>
           )}
           <TtsControls controller={tts} />
           <ToolbarButton
