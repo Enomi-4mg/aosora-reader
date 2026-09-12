@@ -27,7 +27,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   async load() {
     try {
-      set({ settings: await window.aozora.getSettings(), loaded: true, error: null })
+      set({ settings: await window.aozora.getReaderSettings(), loaded: true, error: null })
     } catch (error) {
       // 設定を読めなくても既定値で起動する(要件 §9)。
       // ここで loaded を false のままにすると「起動中…」から先へ進めなくなる。
@@ -45,7 +45,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ settings: { ...previous, ...p }, error: null })
     const request = ++latestSave
     try {
-      const saved = await window.aozora.saveSettings(p)
+      const saved = await window.aozora.saveReaderSettings(p)
       // 連打で応答が前後しても、最後に投げた要求の結果だけを採用する
       if (request === latestSave) set({ settings: saved })
     } catch (error) {
@@ -68,6 +68,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   async reset() {
-    await get().patch(DEFAULT_SETTINGS)
+    try {
+      set({ settings: await window.aozora.resetReaderSettings(), error: null })
+    } catch (error) {
+      set({ error: message(error, '読書設定を初期化できませんでした。') })
+    }
   }
 }))

@@ -1,14 +1,14 @@
 /** 表示設定(要件 §4.7 / §14 Appearance・Reading)。変更は即座に本文へ反映される。 */
 import { useEffect, useRef, useState, type JSX } from 'react'
 import { useSettingsStore } from '../state/useSettingsStore'
+import { customFontFamily, useAppSettingsStore } from '../state/useAppSettingsStore'
 import {
   DEFAULT_SETTINGS,
   FONT_SIZE_MAX,
   FONT_SIZE_MIN,
   LINE_HEIGHT_MAX,
   LINE_HEIGHT_MIN,
-  type ReaderSettings,
-  type ThemeName
+  type ReaderSettings
 } from '@shared/model/settings'
 
 // 先頭は必ず既定値と同一文字列にする。ずれると初回起動時に
@@ -19,12 +19,12 @@ const FONTS: Array<[string, string]> = [
   ['"Hiragino Maru Gothic ProN", "Yu Gothic", sans-serif', '丸ゴシック']
 ]
 
-const THEMES: Array<[ThemeName, string]> = [
+export const THEMES = [
   ['system', 'システムに合わせる'],
   ['light', 'ライト'],
   ['sepia', 'セピア'],
   ['dark', 'ダーク']
-]
+] as const
 
 /**
  * Reader 側の操作。ツールバーに常設せず設定へ集約したものを受け取る。
@@ -48,8 +48,8 @@ export function SettingsPanel({
   reader?: ReaderControls
 }): JSX.Element {
   const { settings, patch, reset, error } = useSettingsStore()
+  const app = useAppSettingsStore()
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
-  const [dataLocation, setDataLocation] = useState('')
   const set = <K extends keyof ReaderSettings>(k: K, v: ReaderSettings[K]) =>
     void patch({ [k]: v } as Partial<ReaderSettings>)
 
@@ -60,8 +60,6 @@ export function SettingsPanel({
     window.speechSynthesis.addEventListener('voiceschanged', load)
     return () => window.speechSynthesis.removeEventListener('voiceschanged', load)
   }, [])
-
-  useEffect(() => { void window.aozora.getDataLocation().then(setDataLocation) }, [])
 
   return (
     <div className="settings-overlay" role="dialog" aria-label="表示設定">
@@ -170,7 +168,7 @@ export function SettingsPanel({
             value={settings.fontFamily}
             onChange={(e) => set('fontFamily', e.target.value)}
           >
-            {FONTS.map(([v, label]) => (
+            {[...FONTS, ...app.fonts.map((font) => [customFontFamily(font.id), font.displayName] as [string, string])].map(([v, label]) => (
               <option key={label} value={v}>{label}</option>
             ))}
           </select>
@@ -231,19 +229,12 @@ export function SettingsPanel({
 
       <section>
         <h3>テーマ</h3>
-        <div className="theme-tabs" role="tablist" aria-label="テーマ">
-          {THEMES.map(([v, label]) => (
-            <button
-              key={v}
-              role="tab"
-              className={settings.theme === v ? 'on' : ''}
-              aria-selected={settings.theme === v}
-              onClick={() => set('theme', v)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <label>
+          配色
+          <select value={app.settings.theme} onChange={(event) => void app.patch({ theme: event.target.value as typeof app.settings.theme })}>
+            {THEMES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
       </section>
 
       <section>
@@ -271,12 +262,10 @@ export function SettingsPanel({
 
       <section>
         <h3>詳細</h3>
-        <p className="data-location" title={dataLocation}>{dataLocation}</p>
         <div className="settings-actions">
-          <button onClick={() => void window.aozora.revealDataLocation()}>保存場所を開く</button>
           <button onClick={() => {
-            if (window.confirm('表示と読み上げの設定を初期値に戻しますか？')) void reset()
-          }}>設定を初期化</button>
+            if (window.confirm('読書設定を初期値に戻しますか？')) void reset()
+          }}>読書設定を初期化</button>
         </div>
       </section>
     </div>

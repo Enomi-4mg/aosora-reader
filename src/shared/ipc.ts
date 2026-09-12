@@ -4,7 +4,7 @@
  */
 import type { Book, BookSummary } from './model/document'
 import type { TextPosition } from './model/position'
-import type { ReaderSettings } from './model/settings'
+import type { AppSettings, ReaderSettings } from './model/settings'
 import type {
   AnnotationBundle,
   Bookmark,
@@ -65,6 +65,14 @@ export interface AozoraCatalogWork {
   cardUrl: string
 }
 
+export interface CustomFontDto {
+  id: string
+  displayName: string
+  fileName: string
+  format: 'ttf' | 'otf' | 'woff' | 'woff2'
+  error?: string
+}
+
 export interface AozoraIpcApi {
   listBooks(): Promise<BookSummary[]>
   importDialog(): Promise<ImportOutcome[]>
@@ -104,8 +112,17 @@ export interface AozoraIpcApi {
   getDataLocation(): Promise<string>
   revealDataLocation(): Promise<void>
 
-  getSettings(): Promise<ReaderSettings>
-  saveSettings(patch: Partial<ReaderSettings>): Promise<ReaderSettings>
+  getAppSettings(): Promise<AppSettings>
+  saveAppSettings(patch: Partial<AppSettings>): Promise<AppSettings>
+  resetAppSettings(): Promise<AppSettings>
+  getReaderSettings(): Promise<ReaderSettings>
+  saveReaderSettings(patch: Partial<ReaderSettings>): Promise<ReaderSettings>
+  resetReaderSettings(): Promise<ReaderSettings>
+  importFonts(): Promise<CustomFontDto[]>
+  listFonts(): Promise<CustomFontDto[]>
+  renameFont(id: string, displayName: string): Promise<CustomFontDto[]>
+  deleteFont(id: string): Promise<CustomFontDto[]>
+  getFontData(id: string): Promise<Uint8Array>
 }
 
 export interface AozoraApi extends AozoraIpcApi {
@@ -142,8 +159,17 @@ export const IPC_CHANNELS = [
   'getFullscreen',
   'getDataLocation',
   'revealDataLocation',
-  'getSettings',
-  'saveSettings'
+  'getAppSettings',
+  'saveAppSettings',
+  'resetAppSettings',
+  'getReaderSettings',
+  'saveReaderSettings',
+  'resetReaderSettings',
+  'importFonts',
+  'listFonts',
+  'renameFont',
+  'deleteFont',
+  'getFontData'
 ] as const satisfies ReadonlyArray<keyof AozoraIpcApi>
 
 export type IpcChannel = (typeof IPC_CHANNELS)[number]

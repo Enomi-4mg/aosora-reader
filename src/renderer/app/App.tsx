@@ -3,25 +3,48 @@ import { LibraryView } from '../library/LibraryView'
 import { ReaderView } from '../reader/ReaderView'
 import { useReaderStore } from '../state/useReaderStore'
 import { useSettingsStore } from '../state/useSettingsStore'
+import { customFontFamily, customFontId, useAppSettingsStore } from '../state/useAppSettingsStore'
+import { DEFAULT_SETTINGS } from '@shared/model/settings'
 import { useLibraryStore } from '../state/useLibraryStore'
 import { importablePathsFromFiles } from '../library/dropImport'
 import { useFullscreen } from '../hooks/useFullscreen'
 
 export function App(): JSX.Element {
-  const { settings, loaded, load } = useSettingsStore()
+  const readerSettings = useSettingsStore()
+  const appSettings = useAppSettingsStore()
   const reader = useReaderStore()
   const library = useLibraryStore()
   const [view, setView] = useState<'library' | 'reader'>('library')
   const { fullscreen } = useFullscreen()
 
   useEffect(() => {
-    void load()
+    void Promise.all([readerSettings.load(), appSettings.load()])
   }, [])
 
   // テーマは data-theme で切り替える。system は CSS 側で prefers-color-scheme に追従。
   useEffect(() => {
-    document.documentElement.dataset.theme = settings.theme
-  }, [settings.theme])
+    document.documentElement.dataset.theme = appSettings.settings.theme
+  }, [appSettings.settings.theme])
+
+  useEffect(() => {
+    let cancelled = false
+    void Promise.allSettled(appSettings.fonts.map(async (font) => {
+      const data = await window.aozora.getFontData(font.id)
+      const face = new FontFace(customFontFamily(font.id).replaceAll('"', ''), new Uint8Array(data).buffer)
+      await face.load()
+      if (!cancelled) document.fonts.add(face)
+      return font.id
+    })).then((results) => {
+      if (cancelled) return
+      const selected = customFontId(readerSettings.settings.fontFamily)
+      if (!selected) return
+      const selectedIndex = appSettings.fonts.findIndex((font) => font.id === selected)
+      if (selectedIndex < 0 || results[selectedIndex]?.status === 'rejected') {
+        void readerSettings.patch({ fontFamily: DEFAULT_SETTINGS.fontFamily })
+      }
+    })
+    return () => { cancelled = true }
+  }, [appSettings.fonts, readerSettings.settings.fontFamily])
 
   // 全画面では信号機ボタンが消えるので、ツールバー左の余白も外す。
   useEffect(() => {
@@ -51,7 +74,7 @@ export function App(): JSX.Element {
     }
   }, [view])
 
-  if (!loaded) return <div className="boot">起動中…</div>
+  if (!readerSettings.loaded || !appSettings.loaded) return <div className="boot">起動中…</div>
 
   if (view === 'reader') {
     return (

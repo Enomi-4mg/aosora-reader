@@ -8,6 +8,8 @@
 export type WritingMode = 'vertical' | 'horizontal'
 export type ReadingMode = 'pagination' | 'scroll'
 export type ThemeName = 'light' | 'sepia' | 'dark' | 'system'
+export type LibraryViewMode = 'grid' | 'list'
+export type LibrarySortKey = 'recent' | 'title' | 'author' | 'added' | 'progress'
 export type ColumnCount = 1 | 2
 
 /** ハイライト色は固定の色名で管理し、実表示色はテーマ側で決める(要件 §5.2)。 */
@@ -26,7 +28,6 @@ export interface ReaderSettings {
   paragraphSpacing: number
   writingMode: WritingMode
   readingMode: ReadingMode
-  theme: ThemeName
   columns: ColumnCount
   /** ページ送りのアニメーション(ms)。0 で無効。 */
   pageTransitionMs: number
@@ -37,6 +38,18 @@ export interface ReaderSettings {
   ttsVolume: number
   /** 読了時間推定の初期値兼、実測値が無い場合の値。 */
   estimatedCharsPerMinute: number
+}
+
+export interface AppSettings {
+  theme: ThemeName
+  libraryView: LibraryViewMode
+  librarySort: LibrarySortKey
+}
+
+export const DEFAULT_APP_SETTINGS: AppSettings = {
+  theme: 'system',
+  libraryView: 'grid',
+  librarySort: 'recent'
 }
 
 export const DEFAULT_SETTINGS: ReaderSettings = {
@@ -50,7 +63,6 @@ export const DEFAULT_SETTINGS: ReaderSettings = {
   paragraphSpacing: 0,
   writingMode: 'vertical',
   readingMode: 'pagination',
-  theme: 'system',
   columns: 1,
   pageTransitionMs: 180,
   ttsVoice: '',
@@ -86,15 +98,23 @@ export function normalizeSettings(raw: Partial<ReaderSettings> | null): ReaderSe
     columns: s.columns === 2 ? 2 : 1,
     writingMode: s.writingMode === 'horizontal' ? 'horizontal' : 'vertical',
     readingMode: s.readingMode === 'scroll' ? 'scroll' : 'pagination',
-    theme: (['light', 'sepia', 'dark', 'system'] as const).includes(s.theme)
-      ? s.theme
-      : 'system',
     pageTransitionMs: clamp(num(s.pageTransitionMs, 180), 0, 600),
     ttsVoice: typeof s.ttsVoice === 'string' ? s.ttsVoice : '',
     ttsRate: clamp(num(s.ttsRate, 1), 0.5, 2),
     ttsPitch: clamp(num(s.ttsPitch, 1), 0.5, 2),
     ttsVolume: clamp(num(s.ttsVolume, 1), 0, 1),
     estimatedCharsPerMinute: clamp(num(s.estimatedCharsPerMinute, 500), 100, 2000)
+  }
+}
+
+export function normalizeAppSettings(raw: Partial<AppSettings> | null): AppSettings {
+  const s = { ...DEFAULT_APP_SETTINGS, ...(raw ?? {}) }
+  return {
+    theme: (['light', 'sepia', 'dark', 'system'] as const).includes(s.theme) ? s.theme : 'system',
+    libraryView: s.libraryView === 'list' ? 'list' : 'grid',
+    librarySort: (['recent', 'title', 'author', 'added', 'progress'] as const).includes(s.librarySort)
+      ? s.librarySort
+      : 'recent'
   }
 }
 

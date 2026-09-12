@@ -3,7 +3,7 @@
  */
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, net, shell } from 'electron'
 import { join } from 'node:path'
-import { normalizeSettings, type ReaderSettings } from '@shared/model/settings'
+import { DEFAULT_APP_SETTINGS, DEFAULT_SETTINGS, normalizeAppSettings, normalizeSettings, type AppSettings, type ReaderSettings } from '@shared/model/settings'
 import type { AozoraIpcApi, ImportOutcome, OpenBookResult } from '@shared/ipc'
 import { openDatabase, type Db } from './db/connection'
 import { BookRepository } from './repositories/BookRepository'
@@ -16,6 +16,7 @@ import { SearchService } from './services/SearchService'
 import { AozoraCatalogService } from './services/AozoraCatalogService'
 import type { SupportedEncoding } from './import/decode'
 import { WiktionaryProvider } from './services/DictionaryService'
+import { CustomFontService } from './services/CustomFontService'
 
 let db: Db
 let books: BookRepository
@@ -27,6 +28,7 @@ let catalog: AozoraCatalogService
 let annotations: AnnotationRepository
 let sessions: ReadingSessionRepository
 let dictionary: WiktionaryProvider
+let customFonts: CustomFontService
 
 function initServices(): void {
   db = openDatabase(join(app.getPath('userData'), 'library.db'))
@@ -47,6 +49,7 @@ function initServices(): void {
     if (!response.ok) throw new Error(`辞書を検索できませんでした (${response.status})`)
     return response.json()
   })
+  customFonts = new CustomFontService(join(app.getPath('userData'), 'fonts'))
 }
 
 function createWindow(): BrowserWindow {
@@ -246,18 +249,61 @@ const handlers: AozoraIpcApi = {
     await shell.openPath(app.getPath('userData'))
   },
 
-  async getSettings(): Promise<ReaderSettings> {
-    return normalizeSettings(settings.getAll() as Partial<ReaderSettings>)
+  async getAppSettings(): Promise<AppSettings> {
+    const raw = settings.getAll()
+    return normalizeAppSettings({
+      theme: (raw['app.theme'] ?? raw.theme) as AppSettings['theme'],
+      libraryView: raw['app.libraryView'] as AppSettings['libraryView'],
+      librarySort: raw['app.librarySort'] as AppSettings['librarySort']
+    })
   },
 
-  async saveSettings(patch): Promise<ReaderSettings> {
+  async saveAppSettings(patch): Promise<AppSettings> {
+    const current = await handlers.getAppSettings()
+    const merged = normalizeAppSettings({ ...current, ...patch })
+    settings.setMany(Object.fromEntries(Object.entries(merged).map(([key, value]) => [`app.${key}`, value])))
+    return merged
+  },
+
+  async resetAppSettings(): Promise<AppSettings> {
+    settings.setMany(Object.fromEntries(Object.entries(DEFAULT_APP_SETTINGS).map(([key, value]) => [`app.${key}`, value])))
+    return DEFAULT_APP_SETTINGS
+  },
+
+  async getReaderSettings(): Promise<ReaderSettings> {
+    const raw = settings.getAll()
+    const prefixed = Object.fromEntries(Object.entries(raw).filter(([key]) => key.startsWith('reader.')).map(([key, value]) => [key.slice(7), value]))
+    return normalizeSettings(Object.keys(prefixed).length ? prefixed : raw as Partial<ReaderSettings>)
+  },
+
+  async saveReaderSettings(patch): Promise<ReaderSettings> {
+    const current = await handlers.getReaderSettings()
     const merged = normalizeSettings({
-      ...(settings.getAll() as Partial<ReaderSettings>),
+      ...current,
       ...patch
     })
-    settings.setMany(merged as unknown as Record<string, unknown>)
+    settings.setMany(Object.fromEntries(Object.entries(merged).map(([key, value]) => [`reader.${key}`, value])))
     return merged
-  }
+  },
+
+  async resetReaderSettings(): Promise<ReaderSettings> {
+    settings.setMany(Object.fromEntries(Object.entries(DEFAULT_SETTINGS).map(([key, value]) => [`reader.${key}`, value])))
+    return DEFAULT_SETTINGS
+  },
+
+  async importFonts() {
+    const result = await dialog.showOpenDialog({
+      title: 'フォントを追加',
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'フォント', extensions: ['ttf', 'otf', 'woff', 'woff2'] }]
+    })
+    return result.canceled ? customFonts.list() : customFonts.import(result.filePaths)
+  },
+
+  async listFonts() { return customFonts.list() },
+  async renameFont(id, displayName) { return customFonts.rename(id, displayName) },
+  async deleteFont(id) { return customFonts.delete(id) },
+  async getFontData(id) { return customFonts.data(id) }
 }
 
 function registerIpc(): void {

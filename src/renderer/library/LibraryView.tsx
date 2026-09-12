@@ -1,8 +1,12 @@
 /** 本棚(要件 §4.13 / §4.14 / §12)。 */
-import { useEffect, useState, type FormEvent, type JSX } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type JSX } from 'react'
+import { Cog6ToothIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline'
 import { useLibraryStore, selectVisibleBooks, type SortKey } from '../state/useLibraryStore'
 import type { BookSummary } from '@shared/model/document'
 import type { AozoraCatalogWork } from '@shared/ipc'
+import { BookActionsMenu } from './BookActionsMenu'
+import { useAppSettingsStore } from '../state/useAppSettingsStore'
+import { AppSettingsDialog } from '../settings/AppSettingsDialog'
 
 const SORT_LABELS: Array<[SortKey, string]> = [
   ['recent', '最近読んだ順'],
@@ -18,14 +22,28 @@ interface Props {
 
 export function LibraryView({ onOpen }: Props): JSX.Element {
   const s = useLibraryStore()
+  const app = useAppSettingsStore()
   const books = selectVisibleBooks(s)
   const [pendingDelete, setPendingDelete] = useState<BookSummary | null>(null)
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [catalogOpen, setCatalogOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const settingsButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     void s.refresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    s.setView(app.settings.libraryView)
+    s.setSort(app.settings.librarySort)
+  }, [app.settings.libraryView, app.settings.librarySort])
+
+  const closeSettings = (): void => {
+    setSettingsOpen(false)
+    requestAnimationFrame(() => settingsButtonRef.current?.focus())
+  }
 
   return (
     <div className="library">
@@ -44,7 +62,11 @@ export function LibraryView({ onOpen }: Props): JSX.Element {
           id="sortby"
           className="select"
           value={s.sort}
-          onChange={(e) => s.setSort(e.target.value as SortKey)}
+          onChange={(e) => {
+            const sort = e.target.value as SortKey
+            s.setSort(sort)
+            void app.patch({ librarySort: sort })
+          }}
         >
           {SORT_LABELS.map(([k, label]) => (
             <option key={k} value={k}>{label}</option>
@@ -54,18 +76,21 @@ export function LibraryView({ onOpen }: Props): JSX.Element {
           <button
             className={s.view === 'grid' ? 'on' : ''}
             aria-pressed={s.view === 'grid'}
-            onClick={() => s.setView('grid')}
+            onClick={() => { s.setView('grid'); void app.patch({ libraryView: 'grid' }) }}
           >
             グリッド
           </button>
           <button
             className={s.view === 'list' ? 'on' : ''}
             aria-pressed={s.view === 'list'}
-            onClick={() => s.setView('list')}
+            onClick={() => { s.setView('list'); void app.patch({ libraryView: 'list' }) }}
           >
             リスト
           </button>
         </div>
+        <button ref={settingsButtonRef} className="library-settings-button" aria-label="アプリ設定" onClick={() => setSettingsOpen(true)}>
+          <Cog6ToothIcon aria-hidden="true" />
+        </button>
         <button disabled={s.busy} onClick={() => void s.importDialog()}>
           ファイルから追加
         </button>
@@ -92,7 +117,13 @@ export function LibraryView({ onOpen }: Props): JSX.Element {
         <ul className={`shelf ${s.view}`}>
           {books.map((b) => (
             <li key={b.id}>
-              <BookCard book={b} onOpen={onOpen} onDelete={() => setPendingDelete(b)} />
+              <BookCard
+                book={b}
+                menuOpen={openMenuId === b.id}
+                onToggleMenu={() => setOpenMenuId((id) => id === b.id ? null : b.id)}
+                onOpen={onOpen}
+                onDelete={() => setPendingDelete(b)}
+              />
             </li>
           ))}
         </ul>
@@ -118,6 +149,7 @@ export function LibraryView({ onOpen }: Props): JSX.Element {
           }}
         />
       )}
+      {settingsOpen && <AppSettingsDialog onClose={closeSettings} />}
     </div>
   )
 }
@@ -206,18 +238,22 @@ function AozoraCatalogDialog({
   )
 }
 
-function BookCard({
+export function BookCard({
   book,
+  menuOpen,
+  onToggleMenu,
   onOpen,
   onDelete
 }: {
   book: BookSummary
+  menuOpen: boolean
+  onToggleMenu: () => void
   onOpen: (id: string) => void
   onDelete: () => void
 }): JSX.Element {
   const pct = Math.round(book.percentage * 100)
   return (
-    <article className="card">
+    <article className={`card${menuOpen ? ' menu-open' : ''}`}>
       <button className="card-main" onClick={() => onOpen(book.id)}>
         <span className="card-title">{book.title}</span>
         <span className="card-author">{book.author ?? '著者不明'}</span>
@@ -229,9 +265,25 @@ function BookCard({
           <span className="progress-fill" style={{ inlineSize: `${pct}%` }} />
         </span>
       </button>
-      <button className="ghost card-del" onClick={onDelete} aria-label={`${book.title} を削除`}>
-        削除
+      <button
+        type="button"
+        className="ghost card-menu-trigger"
+        aria-label={`${book.title} の操作メニュー`}
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation()
+          onToggleMenu()
+        }}
+      >
+        <EllipsisHorizontalIcon aria-hidden="true" />
       </button>
+      {menuOpen && <BookActionsMenu
+        title={book.title}
+        onClose={onToggleMenu}
+        onDelete={() => { onToggleMenu(); onDelete() }}
+      />}
     </article>
   )
 }

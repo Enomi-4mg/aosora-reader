@@ -137,6 +137,8 @@ input, select {
 .library-bar > * { -webkit-app-region: no-drag; }
 .brand { font-size: 15px; margin: 0 8px 0 0; letter-spacing: 0.08em; }
 .search-input { flex: 1; max-inline-size: 320px; }
+.library-settings-button { display: grid; place-items: center; inline-size: 34px; block-size: 32px; padding: 6px; }
+.library-settings-button svg { inline-size: 18px; block-size: 18px; }
 
 .notice {
   display: flex;
@@ -164,13 +166,12 @@ input, select {
 }
 .shelf.grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, 210px);
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   grid-auto-rows: 154px;
-  justify-content: start;
   align-content: start;
   gap: 14px;
 }
-.shelf.grid > li { inline-size: 210px; block-size: 154px; }
+.shelf.grid > li { min-inline-size: 0; block-size: 154px; }
 .shelf.list { display: flex; flex-direction: column; gap: 6px; }
 
 .card {
@@ -182,6 +183,7 @@ input, select {
   border-radius: 10px;
   overflow: hidden;
 }
+.card.menu-open { z-index: 10; overflow: visible; }
 .card-main {
   display: flex;
   flex-direction: column;
@@ -209,8 +211,32 @@ input, select {
 .progress-fill { display: block; block-size: 100%; background: var(--accent); border-radius: 2px; }
 .shelf.list .progress-track { inline-size: 90px; }
 
-.card-del { opacity: 0; align-self: start; margin: 6px; font-size: 12px; }
-.card:hover .card-del, .card-del:focus-visible { opacity: 1; }
+.card-menu-trigger {
+  position: absolute;
+  inset-block-start: 5px;
+  inset-inline-end: 5px;
+  display: grid;
+  place-items: center;
+  inline-size: 30px;
+  block-size: 28px;
+  padding: 5px;
+}
+.card-menu-trigger svg { inline-size: 18px; block-size: 18px; }
+.card-actions-menu {
+  position: absolute;
+  z-index: 20;
+  inset-block-start: 36px;
+  inset-inline-end: 6px;
+  display: grid;
+  min-inline-size: 140px;
+  padding: 5px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+}
+.card-actions-menu button { text-align: start; background: transparent; border: 0; }
+.card-actions-menu .danger-text { color: #b4443c; }
 
 /* ---------- ダイアログ ---------- */
 
@@ -261,6 +287,36 @@ input, select {
 .catalog-work > div { display: grid; gap: 3px; min-inline-size: 0; }
 .catalog-work strong { font-size: 14px; }
 .catalog-work span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.settings-backdrop { z-index: 70; }
+.app-settings-dialog {
+  inline-size: min(640px, calc(100vw - 32px));
+  max-block-size: min(760px, calc(100vh - 40px));
+  overflow-y: auto;
+  gap: 0;
+}
+.app-settings-head {
+  position: sticky;
+  inset-block-start: -20px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: 14px;
+  background: var(--bg);
+}
+.app-settings-dialog section { padding-block: 14px; border-block-start: 1px solid var(--border); }
+.app-settings-dialog h3 { margin: 0 0 10px; font-size: 12px; color: var(--secondary); letter-spacing: 0.08em; }
+.app-settings-dialog label { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-block: 8px; }
+.app-settings-dialog label select { inline-size: min(320px, 60%); }
+.settings-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.settings-section-head h3 { margin: 0; }
+.font-list { display: grid; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+.font-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; }
+.font-list input { min-inline-size: 0; }
+.font-error { color: #a43e37; }
+.danger-text { color: #b4443c; }
+.reset-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 
 @media (max-width: 900px) {
   /* 信号機ボタンは窓幅で縮まないので、左の余白だけは狭くしない。 */

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_SETTINGS,
+  DEFAULT_APP_SETTINGS,
   FONT_SIZE_MAX,
   LINE_HEIGHT_MIN,
+  normalizeAppSettings,
   normalizeSettings
 } from '@shared/model/settings'
 
@@ -30,9 +32,15 @@ describe('normalizeSettings', () => {
   })
 
   it('列挙値は既知の値だけを受ける', () => {
-    const bogus = { theme: 'neon', writingMode: 'diagonal' } as unknown as Partial<typeof DEFAULT_SETTINGS>
+    const bogus = { writingMode: 'diagonal' } as unknown as Partial<typeof DEFAULT_SETTINGS>
     const s = normalizeSettings(bogus)
-    expect(s.theme).toBe('system')
     expect(s.writingMode).toBe('vertical')
+    expect(normalizeAppSettings({ theme: 'neon' as never }).theme).toBe(DEFAULT_APP_SETTINGS.theme)
+  })
+
+  it('アプリ設定の本棚表示を正規化する', () => {
+    expect(normalizeAppSettings({ libraryView: 'list', librarySort: 'title' })).toMatchObject({
+      libraryView: 'list', librarySort: 'title'
+    })
   })
 })
