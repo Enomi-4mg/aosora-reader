@@ -243,7 +243,36 @@
 .page-break { break-after: column; block-size: 0; }
 .rule { border: none; border-block-start: 1px solid var(--border); margin-block: 1.5em; }
 
-.image { margin-block: 1em; }
+/*
+ * 挿絵。
+ *
+ * 寸法の上限は LayoutController が publish する --page-w / --page-h(px)。
+ * CSS だけでは書けない: max-block-size: 100% は祖先の寸法が auto なので解決せず、
+ * 図がページからはみ出す。横書き段組では --page-w は「段幅」であって
+ * ページ幅ではない。
+ *
+ * 変数が未設定なのは初回計測前の一瞬だけ。その間に原寸 1238px の図が
+ * 本文を押し出さないよう、控えめな既定値を置いておく。
+ *
+ * 原寸より拡大はしない。注記の 横W×縦H は底本のスキャン寸法で、
+ * 引き伸ばすと粗さがそのまま出る。
+ */
+.image {
+  margin-block: 1em;
+  /* 横書き段組で図が2段に割れないように。縦書きページングは multicolumn では
+     ないので効かず、図がページ境界をまたぐことは別途の課題。 */
+  break-inside: avoid;
+  text-align: center;
+}
+.image-figure {
+  display: block;
+  max-inline-size: 100%;
+  max-width: var(--page-w, 100%);
+  max-height: var(--page-h, 60vh);
+  width: auto;
+  height: auto;
+  margin-inline: auto;
+}
 .image-placeholder {
   display: inline-block;
   padding: 0.6em 1em;
@@ -251,6 +280,39 @@
   border: 1px dashed var(--border);
   border-radius: 6px;
   font-size: 0.85em;
+}
+
+/*
+ * 図のキャプション。本文として plainText に含まれる独立ブロックなので、
+ * figure の中には入れずに見た目だけ寄せる(dom/contract.ts の規約)。
+ */
+.caption {
+  font-size: 0.85em;
+  color: var(--secondary);
+  text-align: center;
+  margin-block-end: var(--paragraph-spacing);
+  /* 図と離れて次ページの頭に残らないように。
+     キャプション自体が段で割れると、図の下に前半だけが残る。 */
+  break-before: avoid;
+  break-inside: avoid;
+}
+.image:has(+ .caption) { margin-block-end: 0.4em; }
+
+/*
+ * キャプション付きの図は、図とキャプションで1段ぶんを分け合う。
+ *
+ * これが無いと図が段をほぼ埋め、break-before: avoid(図から離さない)と
+ * break-inside: avoid(途中で割らない)が両立できなくなって、
+ * Chromium はキャプションを段の境目で割る。実際に割れる。
+ *
+ * 積み上がる方向は書字方向で変わる。横書きは段の高さ、
+ * 縦書きは本文が伸びる横方向を削る。
+ */
+.wm-horizontal .image:has(+ .caption) .image-figure {
+  max-height: calc(var(--page-h, 60vh) - 5em);
+}
+.wm-vertical .image:has(+ .caption) .image-figure {
+  max-width: calc(var(--page-w, 100%) - 5em);
 }
 
 /*

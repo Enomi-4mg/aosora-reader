@@ -167,9 +167,16 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
         })
       })
     }
-    // Web Font の読み込み完了後に測る。書体変更直後の代替フォント寸法を
-    // ページ数として確定すると、後から境界が一列ずれるため。
-    void document.fonts.ready.then(settle)
+    // Web Font と挿絵の読み込み完了後に測る。
+    // 書体変更直後の代替フォント寸法をページ数として確定すると、後から境界が
+    // 一列ずれる。挿絵も同じで、読み込み前は幅ゼロなので、先に確定させないと
+    // 図のある章がまるごと1ページに潰れる。
+    void Promise.all([
+      document.fonts.ready,
+      ...Array.from(contentRef.current?.querySelectorAll('img') ?? []).map((img) =>
+        img.decode().catch(() => undefined)
+      )
+    ]).then(settle)
     return () => {
       cancelled = true
       cancelAnimationFrame(frame)
@@ -188,24 +195,42 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
     settings.paragraphSpacing
   ])
 
+  /**
+   * 組み直して、いま見ている本文位置に留まる(要件 §16 Progress Tests)。
+   * ref しか読まないので、依存の無い安定した関数にできる。
+   */
+  const remeasure = useCallback(() => {
+    const l = layoutRef.current
+    if (!l) return
+    const keep = positionRef.current
+    restoring.current = true
+    l.measure()
+    if (keep) l.goToPosition(keep)
+    setMetrics(l.metrics())
+    setTimeout(() => { restoring.current = false }, 250)
+  }, [])
+
   // ウィンドウリサイズでも同じ位置に留まる
   useEffect(() => {
     const vp = viewportRef.current
     if (!vp) return
-    const ro = new ResizeObserver(() => {
-      const l = layoutRef.current
-      if (!l) return
-      // リサイズ後も同じ本文位置に留まる(要件 §16 Progress Tests)
-      const keep = positionRef.current
-      restoring.current = true
-      l.measure()
-      if (keep) l.goToPosition(keep)
-      setMetrics(l.metrics())
-      setTimeout(() => { restoring.current = false }, 250)
-    })
+    const ro = new ResizeObserver(remeasure)
     ro.observe(vp)
     return () => ro.disconnect()
-  }, [])
+  }, [remeasure])
+
+  /**
+   * 寸法が注記に無い挿絵の読み込み。
+   *
+   * 1枚ごとに組み直すと章に何十枚もある作品で測り直しが重なるため、
+   * 連続した読み込みを1回の再ページングにまとめる。
+   */
+  const imageSettle = useRef(0)
+  const onImageLoad = useCallback(() => {
+    window.clearTimeout(imageSettle.current)
+    imageSettle.current = window.setTimeout(remeasure, 80)
+  }, [remeasure])
+  useEffect(() => () => window.clearTimeout(imageSettle.current), [])
 
   // --- 論理操作。縦横・ページ/スクロールの違いはここから先に出さない ---
   const next = useCallback(() => {
@@ -697,7 +722,13 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
                 </header>
               )}
               {chapter.blocks.map((b) => (
-                <BlockRenderer key={b.id} block={b} chapterId={chapter.id} />
+                <BlockRenderer
+                  key={b.id}
+                  block={b}
+                  chapterId={chapter.id}
+                  bookId={store.book!.id}
+                  onImageLoad={onImageLoad}
+                />
               ))}
             </div>
           </div>

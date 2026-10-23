@@ -39,7 +39,16 @@ export type Annotation =
   /** ［＃傍点終わり］/［＃ここで傍点終わり］ */
   | { type: 'decoration-end'; decoration: Decoration }
   /** ［＃挿絵（fig.png）入る］ */
-  | { type: 'image'; src: string; alt: string; width?: number; height?: number }
+  | {
+      type: 'image'
+      src: string
+      alt: string
+      caption?: string
+      width?: number
+      height?: number
+    }
+  /** ［＃「X」はキャプション］— 直前の図に属する説明行であることの指定 */
+  | { type: 'caption'; target: string }
   /** 罫線 */
   | { type: 'horizontal-rule' }
   /** 未対応。ゼロ幅の note ノードとして保持する。 */
@@ -154,21 +163,59 @@ export function classifyAnnotation(body: string): Annotation {
     if (d) return { type: 'decoration-start', decoration: d }
   }
 
+  // --- キャプション ---
+  // ［＃「X」はキャプション］。X は直前の行に本文として実在するので、
+  // ここでは「この行は図の説明である」という事実だけを返す。
+  m = b.match(/^「(.+)」は(?:キャプション|図のキャプション)$/)
+  if (m) return { type: 'caption', target: m[1]! }
+
   // --- 画像 ---
-  // ［＃挿絵（fig1.png）入る］ / ［＃「fig1.png」の図（fig1.png、横321×縦123）入る］
-  if (/入る$/.test(b)) {
+  // ［＃挿絵（fig1.png）入る］
+  // ［＃第六図（fig1.png、横260×縦537）入る］
+  // ［＃「第一図」のキャプション付きの図（fig1.png、横321×縦123）入る］
+  // 「入る。」のように句点で閉じる作品がある
+  if (/入る[。．]?$/.test(b)) {
     const file = b.match(/([\w.-]+\.(?:png|jpg|jpeg|gif))/i)
     if (file) {
       const size = toHalfWidthDigits(b).match(/横(\d+)×縦(\d+)/)
-      const alt = b.match(/^「(.+?)」の図/)?.[1] ?? b.replace(/入る$/, '')
-      const img: Annotation = { type: 'image', src: file[1]!, alt }
-      if (size) {
-        ;(img as { width?: number }).width = parseInt(size[1]!, 10)
-        ;(img as { height?: number }).height = parseInt(size[2]!, 10)
+      const label = describeImage(b)
+      const img: Annotation = {
+        type: 'image',
+        src: file[1]!,
+        alt: label.alt,
+        ...(label.caption !== undefined ? { caption: label.caption } : {}),
+        ...(size
+          ? { width: parseInt(size[1]!, 10), height: parseInt(size[2]!, 10) }
+          : {})
       }
       return img
     }
   }
 
   return { type: 'unknown', raw: body }
+}
+
+/**
+ * 画像注記から、人が読める説明とキャプションを取り出す。
+ *
+ * 注記本文をそのまま alt にすると「挿絵（fig46817_01.png、横1238×縦785）」のような
+ * ファイル名混じりの文字列が読み上げと代替表示に出てしまう。
+ * 青空文庫の書式は「説明（ファイル名、寸法）入る」に揃っているので、
+ * 丸括弧の前までが説明にあたる。
+ */
+function describeImage(body: string): { alt: string; caption?: string } {
+  const head = body
+    .replace(/入る[。．]?$/, '')
+    .replace(/（[^（）]*）\s*$/, '')
+    .trim()
+
+  // ［＃「X」のキャプション付きの挿絵（…）入る］ — X が図のキャプション
+  const captioned = head.match(/^「(.+)」のキャプション付きの(?:挿絵|図|写真|画像)\d*$/)
+  if (captioned) return { alt: captioned[1]!, caption: captioned[1]! }
+
+  // ［＃「X」の図（…）入る］ — X は説明だが、キャプションとして組むとは限らない
+  const described = head.match(/^「(.+)」の(?:挿絵|図|写真|画像)\d*$/)
+  if (described) return { alt: described[1]! }
+
+  return { alt: head === '' ? '挿絵' : head }
 }

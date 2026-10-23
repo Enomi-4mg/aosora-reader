@@ -19,6 +19,7 @@ export type BlockType =
   | 'paragraph'
   | 'heading'
   | 'image'
+  | 'caption'
   | 'pageBreak'
   | 'horizontalRule'
   | 'quote'
@@ -139,8 +140,18 @@ export function isContainerNode(
 }
 
 export interface ImagePayload {
+  /** ZIP 同梱画像のファイル名。パスは持たない(保存時に basename へ寄せる)。 */
   src: string
+  /** 代替表示とアクセシブル名。注記から説明部分だけを取り出したもの。 */
   alt: string
+  /**
+   * 注記が指定したキャプション。
+   *
+   * ［＃「X」のキャプション付きの挿絵（…）入る］の X。多くの作品では同じ文字列が
+   * 次の行に本文として実在し、そちらは caption ブロックになる。alt の材料として
+   * 持つだけで、これ自体を本文として描いてはいけない(二重に出る)。
+   */
+  caption?: string
   width?: number
   height?: number
 }

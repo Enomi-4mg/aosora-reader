@@ -10,9 +10,10 @@ import { basename, extname } from 'node:path'
 import type { Book, BookMetadata, SourceType } from '@shared/model/document'
 import { parseAozora, type ParseIssue } from '@shared/parser'
 import { decodeAozoraText, decodeWith, type SupportedEncoding } from '../import/decode'
-import { readAozoraZip, ZipError } from '../import/zip'
+import { readAozoraZip, ZipError, type ZipContents } from '../import/zip'
 import { bookIdFromHash, hashText } from '../import/hash'
 import type { BookRepository } from '../repositories/BookRepository'
+import type { BookImageService } from './BookImageService'
 
 export type ImportOutcome =
   | { status: 'imported'; bookId: string; title: string; issues: ParseIssue[] }
@@ -40,7 +41,14 @@ function extensionOf(sourcePath: string): string {
 }
 
 export class ImportService {
-  constructor(private readonly books: BookRepository) {}
+  /**
+   * @param images 省略すると挿絵を保存しない。パーサーのテストのように
+   *   本文だけを扱う経路では渡さなくてよい。
+   */
+  constructor(
+    private readonly books: BookRepository,
+    private readonly images?: BookImageService
+  ) {}
 
   /**
    * 1ファイルを取り込む。
@@ -78,9 +86,11 @@ export class ImportService {
 
       let bytes: Uint8Array<ArrayBufferLike> = raw
       let sourceType: SourceType = 'txt'
+      let archive: ZipContents | null = null
       if (ext === '.zip') {
         sourceType = 'zip'
-        bytes = readAozoraZip(raw).main.bytes
+        archive = readAozoraZip(raw)
+        bytes = archive.main.bytes
       }
 
       let text: string
@@ -102,9 +112,16 @@ export class ImportService {
       }
 
       const sourceHash = hashText(text)
+      const existing = this.books.findByHash(sourceHash)
+      const bookId = existing?.id ?? bookIdFromHash(sourceHash)
+
+      // 挿絵は本文より先に書き出す。ここで保存しておくと、挿絵対応より前に
+      // 取り込んだ本を入れ直したときも(= 重複と判定される経路でも)画像が揃う。
+      if (archive && this.images && !this.images.has(bookId)) {
+        this.images.save(bookId, archive.images)
+      }
 
       // 重複判定(要件 §4.1)
-      const existing = this.books.findByHash(sourceHash)
       if (existing && !existing.deleted) {
         return { status: 'duplicate', bookId: existing.id, title: existing.title }
       }
@@ -112,7 +129,7 @@ export class ImportService {
       const parsed = parseAozora(text)
       const now = new Date().toISOString()
       const book: Book = {
-        id: existing?.id ?? bookIdFromHash(sourceHash),
+        id: bookId,
         title: parsed.title || fallbackTitle,
         subtitle: parsed.subtitle,
         author: parsed.author,

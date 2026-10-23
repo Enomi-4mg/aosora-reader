@@ -9,7 +9,7 @@ import {
   textRangeToDomRange,
   runTextLength
 } from '@renderer/reader/dom/positionMapping'
-import { SELECTOR_RUN } from '@renderer/reader/dom/contract'
+import { SELECTOR_BLOCK, SELECTOR_RUN } from '@renderer/reader/dom/contract'
 import { parseAozora } from '@shared/parser'
 import type { Block } from '@shared/model/document'
 
@@ -22,9 +22,11 @@ function render(source: string): { block: Block; el: HTMLElement } {
     .flatMap((c) => c.blocks)
     .find((b) => b.plainText !== '')!
   document.body.innerHTML = renderToStaticMarkup(
-    <BlockRenderer block={block} chapterId="c0" />
+    <BlockRenderer block={block} chapterId="c0" bookId={BOOK} />
   )
-  return { block, el: document.body.firstElementChild as HTMLElement }
+  // React は画像の preload link をブロックより前に出すので、
+  // 先頭の要素ではなくブロックそのものを取る。
+  return { block, el: document.body.querySelector(SELECTOR_BLOCK) as HTMLElement }
 }
 
 beforeEach(() => {
@@ -134,7 +136,7 @@ describe('TextRange と DOM Range', () => {
     const blocks = parsed.chapters.flatMap((chapter) => chapter.blocks)
       .filter((block) => block.plainText.length > 0)
     document.body.innerHTML = renderToStaticMarkup(<>
-      {blocks.map((block) => <BlockRenderer key={block.id} block={block} chapterId="c0" />)}
+      {blocks.map((block) => <BlockRenderer key={block.id} block={block} chapterId="c0" bookId={BOOK} />)}
     </>)
     const tr = {
       start: { bookId: BOOK, chapterId: 'c0', blockId: blocks[0]!.id, offset: 1 },

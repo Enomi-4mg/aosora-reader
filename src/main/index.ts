@@ -1,7 +1,7 @@
 /**
  * Electron main プロセス。fs / SQLite / パーサーはすべてこちら側に閉じる。
  */
-import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, net, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, net, protocol, shell } from 'electron'
 import { join } from 'node:path'
 import { DEFAULT_APP_SETTINGS, DEFAULT_SETTINGS, normalizeAppSettings, normalizeSettings, type AppSettings, type ReaderSettings } from '@shared/model/settings'
 import type { AozoraIpcApi, ImportOutcome, OpenBookResult } from '@shared/ipc'
@@ -17,6 +17,8 @@ import { AozoraCatalogService } from './services/AozoraCatalogService'
 import type { SupportedEncoding } from './import/decode'
 import { WiktionaryProvider } from './services/DictionaryService'
 import { CustomFontService } from './services/CustomFontService'
+import { BookImageService } from './services/BookImageService'
+import { IMAGE_SCHEME } from '@shared/ipc'
 
 let db: Db
 let books: BookRepository
@@ -29,13 +31,15 @@ let annotations: AnnotationRepository
 let sessions: ReadingSessionRepository
 let dictionary: WiktionaryProvider
 let customFonts: CustomFontService
+let bookImages: BookImageService
 
 function initServices(): void {
   db = openDatabase(join(app.getPath('userData'), 'library.db'))
   books = new BookRepository(db)
   progress = new ProgressRepository(db)
   settings = new SettingsRepository(db)
-  importer = new ImportService(books)
+  bookImages = new BookImageService(join(app.getPath('userData'), 'images'))
+  importer = new ImportService(books, bookImages)
   search = new SearchService(db)
   catalog = new AozoraCatalogService(importer, async (url) => {
     const response = await net.fetch(url, { signal: AbortSignal.timeout(30_000) })
@@ -151,6 +155,9 @@ const handlers: AozoraIpcApi = {
 
   async deleteBook(bookId: string, keepUserData: boolean) {
     books.delete(bookId, keepUserData)
+    // keepUserData でも本文は消える(注釈だけを残す)ので、挿絵も一緒に消す。
+    // 取り込み直せば blockId ごと復元されるのと同じく、画像も入り直す。
+    bookImages.remove(bookId)
   },
 
   async openBook(bookId: string): Promise<OpenBookResult | null> {
@@ -323,8 +330,45 @@ function registerIpc(): void {
   }
 }
 
+/**
+ * 挿絵の配信スキーム。
+ *
+ * IPC で Uint8Array を返す作りにすると、47 枚ある作品で 47 往復することになる。
+ * <img src> から直接引けるようにして、遅延読み込みとキャッシュをブラウザに任せる。
+ * standard にするのはホスト名(= bookId)とパスを URL として解釈させるため。
+ */
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: IMAGE_SCHEME,
+    privileges: { standard: true, secure: true, supportFetchAPI: true }
+  }
+])
+
+function registerImageProtocol(): void {
+  protocol.handle(IMAGE_SCHEME, (request) => {
+    const notFound = new Response(null, { status: 404 })
+    let url: URL
+    try {
+      url = new URL(request.url)
+    } catch {
+      return notFound
+    }
+    const name = decodeURIComponent(url.pathname).replace(/^\//, '')
+    const found = bookImages.read(url.hostname, name)
+    if (!found) return notFound
+    // bookId は原本ハッシュ由来で、同じ URL の中身が変わることはない。
+    return new Response(found.bytes, {
+      headers: {
+        'content-type': found.mime,
+        'cache-control': 'public, max-age=31536000, immutable'
+      }
+    })
+  })
+}
+
 app.whenReady().then(() => {
   initServices()
+  registerImageProtocol()
   registerIpc()
   createWindow()
 

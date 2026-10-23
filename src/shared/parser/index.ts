@@ -157,7 +157,7 @@ interface BlockDraft {
   plainText: string
   indentLevel: number
   headingLevel?: 1 | 2 | 3
-  image?: { src: string; alt: string; width?: number; height?: number }
+  image?: { src: string; alt: string; caption?: string; width?: number; height?: number }
   sourceStart: number
   sourceEnd: number
 }
@@ -189,6 +189,7 @@ function buildChapters(
     let image: BlockDraft['image']
     let headingForThisLine: 1 | 2 | 3 | null = null
     let headingEnds = false
+    let isCaption = false
 
     for (const d of directives) {
       switch (d.annotation.type) {
@@ -202,9 +203,13 @@ function buildChapters(
           image = {
             src: d.annotation.src,
             alt: d.annotation.alt,
+            ...(d.annotation.caption !== undefined ? { caption: d.annotation.caption } : {}),
             ...(d.annotation.width !== undefined ? { width: d.annotation.width } : {}),
             ...(d.annotation.height !== undefined ? { height: d.annotation.height } : {})
           }
+          break
+        case 'caption':
+          isCaption = true
           break
         case 'indent':
           pendingIndent = d.annotation.level
@@ -268,8 +273,11 @@ function buildChapters(
       continue
     }
 
+    // キャプションは本文として plainText に含まれる。型だけを変えて
+    // 図に寄せて組む。ここで本文から外すと座標がずれる(不変条件 A)。
+    const type = level !== null ? 'heading' : isCaption ? 'caption' : 'paragraph'
     drafts.push({
-      type: level !== null ? 'heading' : 'paragraph',
+      type,
       children,
       plainText,
       indentLevel,

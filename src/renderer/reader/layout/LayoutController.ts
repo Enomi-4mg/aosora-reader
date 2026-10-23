@@ -72,6 +72,40 @@ export class LayoutController {
     return Math.max(1, Math.round(vp.clientWidth - padding))
   }
 
+  /** 固定余白を除いた、実際に本文が見える高さ。 */
+  private pageHeight(): number {
+    const vp = this.ctx.viewport
+    const style = getComputedStyle(vp)
+    const padding = Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom)
+    return Math.max(1, Math.round(vp.clientHeight - padding))
+  }
+
+  /**
+   * 挿絵が収まるべき箱を px で publish する。
+   *
+   * CSS だけでは書けない。`max-block-size: 100%` は祖先の寸法が auto なので
+   * 解決せず、図がページからはみ出す。ここで実寸を測って渡す。
+   *
+   * 画像は物理的なラスタなので、論理方向ではなく物理の幅・高さで渡す。
+   * 横書き段組では「ページ幅」ではなく「段幅」を渡すこと。ページ幅を渡すと
+   * 図が隣の段へはみ出す。段数と段間は CSS を唯一の正として読む。
+   *
+   * 縦書きページングは multicolumn ではなく transform による送りなので、
+   * break-inside が効かない。図がページ境界をまたぐことは防げず、
+   * ここでできるのは「1ページより大きい図を作らない」ことまで。
+   */
+  private publishPageBox(): void {
+    const { content, viewport } = this.ctx
+    const host = viewport.parentElement ?? viewport
+    const boxWidth = this.pageWidth()
+    const columns = this.vertical || !this.paginated
+      ? 1
+      : Math.max(1, Number.parseInt(getComputedStyle(content).columnCount, 10) || 1)
+    const imageWidth = Math.max(1, (boxWidth - this.gap * (columns - 1)) / columns)
+    host.style.setProperty('--page-w', `${Math.floor(imageWidth)}px`)
+    host.style.setProperty('--page-h', `${this.pageHeight()}px`)
+  }
+
   /**
    * レイアウトを組み直してページ数を測る。
    * フォント変更・writingMode 変更・リサイズのたびに呼ぶ。
@@ -79,6 +113,8 @@ export class LayoutController {
   measure(): LayoutMetrics {
     const { content } = this.ctx
     this.gap = this.vertical ? 0 : this.columnGap()
+    // 挿絵の寸法は本文の広がりに影響するので、scrollWidth を読む前に確定させる。
+    this.publishPageBox()
     const pageWidth = this.pageWidth()
 
     if (!this.paginated) {

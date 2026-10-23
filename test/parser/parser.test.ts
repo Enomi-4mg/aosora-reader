@@ -337,6 +337,57 @@ describe('改ページ / 画像 / 罫線', () => {
     const img = r.chapters.flatMap((c) => c.blocks).find((b) => b.type === 'image')!
     expect(img.image).toMatchObject({ src: 'fig1.png', width: 321, height: 123 })
   })
+
+  /*
+   * alt は代替表示と読み上げに出る。注記本文をそのまま入れると
+   * 「挿絵（fig46817_01.png、横1238×縦785）」のようにファイル名まで読まれる。
+   */
+  it('alt は注記からファイル名と寸法を落とした説明にする', () => {
+    const alt = (body: string): string =>
+      parseBody(body).chapters
+        .flatMap((c) => c.blocks)
+        .find((b) => b.type === 'image')!.image!.alt
+
+    expect(alt('［＃挿絵（fig1.png、横10×縦20）入る］')).toBe('挿絵')
+    expect(alt('［＃挿絵１２（fig1.png、横10×縦20）入る］')).toBe('挿絵１２')
+    expect(alt('［＃第六図（fig1.png、横10×縦20）入る］')).toBe('第六図')
+    expect(alt('［＃ｓの数式（fig1.png、横10×縦20）入る］')).toBe('ｓの数式')
+    expect(alt('［＃挿絵（fig1.png）入る］')).toBe('挿絵')
+    // 「入る。」と句点で閉じる作品がある
+    expect(alt('［＃「ネーヱ」の歌詞の楽譜（fig1.png）入る。］')).toBe('「ネーヱ」の歌詞の楽譜')
+  })
+
+  it('キャプション付きの挿絵はキャプションを取り出す', () => {
+    const r = parseBody(
+      '［＃「〈星から出るのに〉」のキャプション付きの挿絵（fig1.png、横1238×縦785）入る］'
+    )
+    const img = r.chapters.flatMap((c) => c.blocks).find((b) => b.type === 'image')!
+    expect(img.image).toMatchObject({
+      src: 'fig1.png',
+      alt: '〈星から出るのに〉',
+      caption: '〈星から出るのに〉'
+    })
+  })
+
+  /*
+   * キャプション行の本文は plainText に残したまま型だけを変える。
+   * ここで本文から外すと、その行以降のハイライト位置がずれる(不変条件 A)。
+   */
+  it('キャプション行は本文を保ったまま caption ブロックになる', () => {
+    const r = parseBody(
+      '［＃挿絵（fig1.png、横10×縦20）入る］\n〈キャプ〉［＃「〈キャプ〉」はキャプション］'
+    )
+    const blocks = r.chapters.flatMap((c) => c.blocks)
+    expect(blocks.map((b) => b.type)).toContain('caption')
+    const caption = blocks.find((b) => b.type === 'caption')!
+    expect(caption.plainText).toBe('〈キャプ〉')
+    assertOffsetsConsistent(caption)
+  })
+
+  it('キャプション注記は未対応注記として残さない', () => {
+    const r = parseBody('〈キャプ〉［＃「〈キャプ〉」はキャプション］')
+    expect(r.issues.filter((i) => i.raw.includes('キャプション'))).toEqual([])
+  })
 })
 
 describe('不正注記 / 頑健性', () => {

@@ -16,6 +16,19 @@ import type {
 import type { TextRange } from './model/position'
 import type { HighlightColor } from './model/settings'
 
+/**
+ * 挿絵を配信するカスタムスキーム。
+ *
+ * 画像は IPC ではなくこのスキーム経由で渡す。URL の組み立てを main と renderer で
+ * 二重に書くと片方だけ直して壊れるので、両者ともこの定数と関数だけを使う。
+ */
+export const IMAGE_SCHEME = 'aozora-img'
+
+/** 挿絵の URL。実在するかは問わない(無ければ renderer 側が代替表示に落とす)。 */
+export function bookImageUrl(bookId: string, fileName: string): string {
+  return `${IMAGE_SCHEME}://${bookId}/${encodeURIComponent(fileName)}`
+}
+
 export interface ImportIssueSummary {
   kind: string
   message: string
