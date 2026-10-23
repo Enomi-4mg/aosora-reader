@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { openDatabase, type Db } from '../../src/main/db/connection'
+import { MIGRATIONS } from '../../src/main/db/migrations'
 import { BookRepository } from '../../src/main/repositories/BookRepository'
 import { AnnotationRepository } from '../../src/main/repositories/AnnotationRepository'
 import { ReadingSessionRepository } from '../../src/main/repositories/ReadingSessionRepository'
@@ -25,7 +26,9 @@ beforeEach(() => {
 describe('Phase 2 migration', () => {
   it('範囲メモとセッション位置の列を追加する', () => {
     const v = db.prepare('PRAGMA user_version').get() as { user_version: number }
-    expect(v.user_version).toBe(2)
+    // 最新のマイグレーションまで当たっていること。版を直書きすると
+    // マイグレーションを足すたびにここが落ちる。
+    expect(v.user_version).toBe(MIGRATIONS[MIGRATIONS.length - 1]!.version)
     const noteColumns = db.prepare('PRAGMA table_info(notes)').all() as unknown as Array<{ name: string }>
     expect(noteColumns.map((c) => c.name)).toContain('end_block_id')
     const sessionColumns = db.prepare('PRAGMA table_info(reading_sessions)').all() as unknown as Array<{ name: string }>

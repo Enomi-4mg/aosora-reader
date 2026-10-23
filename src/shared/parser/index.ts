@@ -15,6 +15,18 @@ import type { Decoration } from './annotation'
 import { IssueCollector, type ParseIssue } from './errors'
 import { parseInline } from './inline'
 
+/**
+ * パーサーの出力版。**出力が変わる修正を入れたら必ず上げる。**
+ *
+ * 取り込み時に本へ記録し、開くときにこの値と食い違っていれば解析し直す。
+ * パースは取り込み時の1回だけという原則(要件 §5.3)は変えていない。
+ * 変わったのは「いつ1回目をやり直すか」であって、開くたびに解析はしない。
+ *
+ * 1: 初版
+ * 2: 挿絵のキャプションと alt、注記の入れ子、行なか画像、画像外字
+ */
+export const PARSER_VERSION = 2
+
 export interface ParseResult {
   title: string
   subtitle: string | null

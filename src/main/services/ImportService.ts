@@ -147,7 +147,7 @@ export class ImportService {
 
       if (existing?.deleted) {
         // 本棚から外していた作品。blockId が一致するので注釈がそのまま繋がる。
-        this.books.restore(book)
+        this.books.restore(book, text)
         return {
           status: 'restored',
           bookId: book.id,
@@ -156,7 +156,7 @@ export class ImportService {
         }
       }
 
-      this.books.insert(book)
+      this.books.insert(book, text)
       return {
         status: 'imported',
         bookId: book.id,

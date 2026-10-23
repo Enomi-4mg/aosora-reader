@@ -97,6 +97,69 @@ export class AnnotationRepository {
     this.db.prepare('DELETE FROM notes WHERE id = ?').run(id)
   }
 
+  /**
+   * この本の注釈が持つ位置をすべて付け替える。
+   *
+   * パーサーを更新して本文を作り直したときに ReparseService から呼ぶ。
+   * move が null を返した位置は動かさない。blockId ごと消えた場合は
+   * resolveRange が selectedText で本文を探し直し、それでも駄目なら
+   * orphan として見せる経路が既にあるので、ここで消したりはしない。
+   *
+   * ハイライトと範囲メモも必ず通すこと。resolveRange は「ブロックが実在するか」
+   * しか見ないので、blockId が残ったまま offset だけずれると、
+   * 探し直しが走らず静かに別の場所を指したままになる。
+   */
+  remapPositions(
+    bookId: string,
+    move: (p: TextPosition) => TextPosition | null
+  ): { moved: number; kept: number } {
+    let moved = 0
+    let kept = 0
+
+    const apply = (
+      table: 'bookmarks' | 'notes' | 'highlights',
+      prefix: '' | 'start_' | 'end_',
+      row: Record<string, unknown>
+    ): void => {
+      const from = pos(bookId, row, prefix)
+      const to = move(from)
+      if (!to) {
+        kept++
+        return
+      }
+      if (
+        to.chapterId === from.chapterId &&
+        to.blockId === from.blockId &&
+        to.offset === from.offset
+      ) {
+        return
+      }
+      this.db
+        .prepare(
+          `UPDATE ${table} SET ${prefix}chapter_id = ?, ${prefix}block_id = ?, ${prefix}offset = ?
+           WHERE id = ?`
+        )
+        .run(to.chapterId, to.blockId, to.offset, row.id as string)
+      moved++
+    }
+
+    const all = (sql: string): Array<Record<string, unknown>> =>
+      this.db.prepare(sql).all(bookId) as unknown as Array<Record<string, unknown>>
+
+    for (const row of all('SELECT * FROM bookmarks WHERE book_id = ?')) {
+      apply('bookmarks', '', row)
+    }
+    for (const row of all('SELECT * FROM notes WHERE book_id = ? AND block_id IS NOT NULL')) {
+      apply('notes', '', row)
+      if (row.end_block_id) apply('notes', 'end_', row)
+    }
+    for (const row of all('SELECT * FROM highlights WHERE book_id = ?')) {
+      apply('highlights', 'start_', row)
+      apply('highlights', 'end_', row)
+    }
+    return { moved, kept }
+  }
+
   private listBookmarks(bookId: string): Bookmark[] {
     const rows = this.db.prepare(
       'SELECT * FROM bookmarks WHERE book_id = ? ORDER BY created_at'

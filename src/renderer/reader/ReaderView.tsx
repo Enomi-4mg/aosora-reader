@@ -644,6 +644,16 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
         {authorOpen && <AuthorPopover book={store.book} onOpenBook={onOpenBook} onClose={() => setAuthorOpen(false)} />}
       </header>
 
+      {/*
+        * 作り直せない本の断り書き。原文を保存していなかった(この仕組みより前に
+        * 取り込んだ)本は、取り込み直すまで古い解析結果のまま表示される。
+        * 黙っていると「直したのに反映されない」としか見えない。
+        */}
+      {store.needsReimport && (
+        <p className="stale-parse">
+          この作品は古い解析結果のまま表示されています。取り込み直すと、挿絵や注記の表示が新しくなります。
+        </p>
+      )}
       <div className="reader-body">
         {store.sidebarOpen && (
           <aside className="sidebar" aria-label="サイドパネル">

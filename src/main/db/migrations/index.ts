@@ -154,5 +154,19 @@ ALTER TABLE reading_sessions ADD COLUMN end_chapter_id TEXT;
 ALTER TABLE reading_sessions ADD COLUMN end_block_id TEXT;
 ALTER TABLE reading_sessions ADD COLUMN end_offset INTEGER;
 `
+  },
+  {
+    version: 3,
+    name: 'reparse-on-parser-change',
+    sql: `
+-- 取り込んだときのパーサー版。既存の本は 0 とみなし、原文があれば作り直す。
+ALTER TABLE books ADD COLUMN parser_version INTEGER NOT NULL DEFAULT 0;
+
+-- デコード後の原文。作り直しに要る。
+-- sourcePath は公式カタログだと URL で、ローカルでも移動や削除が起こりうるので、
+-- 取り込み元に頼ると「開いたら作り直せない」が普通に起きる。
+-- 本文は中央値で数 KB、最大でも 2MB 程度なので抱えても困らない。
+ALTER TABLE books ADD COLUMN source_text TEXT;
+`
   }
 ]

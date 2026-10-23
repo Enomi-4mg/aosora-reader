@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { openDatabase, type Db } from '../../src/main/db/connection'
+import { MIGRATIONS } from '../../src/main/db/migrations'
 import { BookRepository } from '../../src/main/repositories/BookRepository'
 import { ProgressRepository } from '../../src/main/repositories/ProgressRepository'
 import { SettingsRepository } from '../../src/main/repositories/SettingsRepository'
@@ -70,7 +71,7 @@ beforeEach(() => {
 describe('マイグレーション', () => {
   it('user_version が進む', () => {
     const v = db.prepare('PRAGMA user_version').get() as { user_version: number }
-    expect(v.user_version).toBe(2)
+    expect(v.user_version).toBe(MIGRATIONS[MIGRATIONS.length - 1]!.version)
   })
 
   it('再実行しても壊れない', () => {

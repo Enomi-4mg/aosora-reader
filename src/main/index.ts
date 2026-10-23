@@ -18,6 +18,7 @@ import type { SupportedEncoding } from './import/decode'
 import { WiktionaryProvider } from './services/DictionaryService'
 import { CustomFontService } from './services/CustomFontService'
 import { BookImageService } from './services/BookImageService'
+import { ReparseService } from './services/ReparseService'
 import { IMAGE_SCHEME } from '@shared/ipc'
 
 let db: Db
@@ -32,6 +33,7 @@ let sessions: ReadingSessionRepository
 let dictionary: WiktionaryProvider
 let customFonts: CustomFontService
 let bookImages: BookImageService
+let reparse: ReparseService
 
 function initServices(): void {
   db = openDatabase(join(app.getPath('userData'), 'library.db'))
@@ -48,6 +50,7 @@ function initServices(): void {
   })
   annotations = new AnnotationRepository(db)
   sessions = new ReadingSessionRepository(db)
+  reparse = new ReparseService(books, annotations, progress)
   dictionary = new WiktionaryProvider(async (url) => {
     const response = await net.fetch(url, { signal: AbortSignal.timeout(10_000) })
     if (!response.ok) throw new Error(`辞書を検索できませんでした (${response.status})`)
@@ -161,9 +164,23 @@ const handlers: AozoraIpcApi = {
   },
 
   async openBook(bookId: string): Promise<OpenBookResult | null> {
+    // パーサーを更新していれば、本文をここで一度だけ作り直す。
+    // 位置情報の付け替えも ReparseService の中で終わっているので、
+    // このあと読むのは常に新しい本文と新しい位置。
+    const outcome = reparse.run(bookId)
+    if (outcome.status === 'updated') {
+      console.info(
+        `[reparse] ${bookId}: 本文を作り直した ` +
+          `(位置の付け替え ${outcome.movedPositions}件 / 付け替えられず ${outcome.droppedPositions}件)`
+      )
+    }
     const book = books.load(bookId)
     if (!book) return null
-    return { book, progress: progress.get(bookId) }
+    return {
+      book,
+      progress: progress.get(bookId),
+      needsReimport: outcome.status === 'unavailable'
+    }
   },
 
   async saveProgress(p) {

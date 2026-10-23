@@ -67,6 +67,12 @@ export interface SearchResultDto {
 export interface OpenBookResult {
   book: Book
   progress: ReadingProgressDto | null
+  /**
+   * パーサーが更新されているのに本文を作り直せない本。
+   * 原文を保存していなかった(この仕組みより前に取り込んだ)ので、
+   * 取り込み直すまで古い解析結果のまま表示される。
+   */
+  needsReimport: boolean
 }
 
 export interface AozoraCatalogWork {

@@ -27,6 +27,11 @@ interface ReaderState {
   percentage: number
   loading: boolean
   error: string | null
+  /**
+   * パーサーが更新されているのに本文を作り直せない本。
+   * 原文を保存していなかったので、取り込み直すまで古い解析結果のまま。
+   */
+  needsReimport: boolean
 
   sidebarOpen: boolean
   sidebarTab: SidebarTab
@@ -78,6 +83,7 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
   searchResult: null,
   searchCursor: 0,
   searchError: null,
+  needsReimport: false,
 
   async open(bookId) {
     const request = ++latestOpenRequest
@@ -103,7 +109,8 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
         position,
         chapterIndex,
         percentage: position ? positionToPercentage(index, position) : 0,
-        loading: false
+        loading: false,
+        needsReimport: r.needsReimport
       })
     } catch (e) {
       if (request !== latestOpenRequest) return

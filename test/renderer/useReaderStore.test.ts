@@ -62,9 +62,9 @@ describe('useReaderStore の作品切り替え', () => {
       .mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise) } })
     const a = useReaderStore.getState().open('a')
     const b = useReaderStore.getState().open('b')
-    second.resolve({ book: buildBook([['章', ['B']]], 'b'), progress: null })
+    second.resolve({ book: buildBook([['章', ['B']]], 'b'), progress: null, needsReimport: false })
     await b
-    first.resolve({ book: buildBook([['章', ['A']]], 'a'), progress: null })
+    first.resolve({ book: buildBook([['章', ['A']]], 'a'), progress: null, needsReimport: false })
     await a
     expect(useReaderStore.getState().book?.id).toBe('b')
   })
@@ -79,7 +79,7 @@ describe('useReaderStore の作品切り替え', () => {
     useReaderStore.getState().close()
     expect(useReaderStore.getState().loading).toBe(false)
     pending.resolve(outcome === 'success'
-      ? { book: buildBook([['章', ['A']]], 'a'), progress: null } : null)
+      ? { book: buildBook([['章', ['A']]], 'a'), progress: null, needsReimport: false } : null)
     await opening
     expect(useReaderStore.getState()).toMatchObject({ book: null, loading: false, error: null })
   })

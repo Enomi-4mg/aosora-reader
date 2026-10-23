@@ -3,6 +3,7 @@
  * DB アクセスはこの層に閉じ込め、Service より上に SQL を漏らさない(要件 §20-5)。
  */
 import type { Block, Book, BookSummary, Chapter } from '@shared/model/document'
+import { PARSER_VERSION } from '@shared/parser'
 import { transaction, type Db } from '../db/connection'
 
 interface BookRow {
@@ -19,6 +20,8 @@ interface BookRow {
   metadata_json: string
   imported_at: string
   updated_at: string
+  parser_version: number
+  source_text: string | null
 }
 
 interface ChapterRow {
@@ -49,14 +52,51 @@ export class BookRepository {
    * 本棚から外していた作品を、本文を入れ直して復活させる。
    * blockId は同じ原本から決定的に再生成されるため、注釈がそのまま繋がる。
    */
-  restore(book: Book): void {
+  /**
+   * 取り込み時のパーサー版と原文。
+   * 原文が無い本(この仕組みより前に取り込んだ本)は作り直せない。
+   */
+  parseState(bookId: string): { version: number; sourceText: string | null } | null {
+    const r = this.db
+      .prepare('SELECT parser_version, source_text FROM books WHERE id = ?')
+      .get(bookId) as { parser_version: number; source_text: string | null } | undefined
+    return r ? { version: r.parser_version, sourceText: r.source_text } : null
+  }
+
+  /**
+   * 本文だけを作り直す。books 行と注釈はそのまま残す。
+   * 位置の付け替えは呼び出し側(ReparseService)の責任。
+   */
+  replaceContent(bookId: string, book: Book): void {
+    transaction(this.db, () => {
+      this.db.prepare('DELETE FROM chapters WHERE book_id = ?').run(bookId)
+      this.db.prepare('DELETE FROM blocks WHERE book_id = ?').run(bookId)
+      this.db
+        .prepare(
+          `UPDATE books SET total_characters = ?, metadata_json = ?, updated_at = ?,
+             parser_version = ?
+           WHERE id = ?`
+        )
+        .run(
+          book.totalCharacters,
+          JSON.stringify(book.metadata),
+          book.updatedAt,
+          PARSER_VERSION,
+          bookId
+        )
+      this.writeContent(bookId, book.chapters)
+    })
+  }
+
+  restore(book: Book, sourceText?: string): void {
     transaction(this.db, () => {
       this.db.prepare('DELETE FROM chapters WHERE book_id = ?').run(book.id)
       this.db.prepare('DELETE FROM blocks WHERE book_id = ?').run(book.id)
       this.db
         .prepare(
           `UPDATE books SET deleted_at = NULL, source_path = ?, encoding = ?,
-             total_characters = ?, metadata_json = ?, updated_at = ?
+             total_characters = ?, metadata_json = ?, updated_at = ?,
+             parser_version = ?, source_text = ?
            WHERE id = ?`
         )
         .run(
@@ -65,6 +105,8 @@ export class BookRepository {
           book.totalCharacters,
           JSON.stringify(book.metadata),
           book.updatedAt,
+          PARSER_VERSION,
+          sourceText ?? null,
           book.id
         )
       this.writeContent(book.id, book.chapters)
@@ -81,14 +123,14 @@ export class BookRepository {
     return r ? { id: r.id } : null
   }
 
-  insert(book: Book): void {
+  insert(book: Book, sourceText?: string): void {
     transaction(this.db, () => {
       this.db
         .prepare(
           `INSERT INTO books (id, title, subtitle, author, translator, source_path,
              source_type, encoding, source_hash, total_characters, metadata_json,
-             imported_at, updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
+             imported_at, updated_at, parser_version, source_text)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
         )
         .run(
           book.id,
@@ -103,7 +145,9 @@ export class BookRepository {
           book.totalCharacters,
           JSON.stringify(book.metadata),
           book.importedAt,
-          book.updatedAt
+          book.updatedAt,
+          PARSER_VERSION,
+          sourceText ?? null
         )
 
       this.writeContent(book.id, book.chapters)

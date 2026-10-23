@@ -5,11 +5,19 @@
  * 横書きは multicolumn、縦書きは writing-mode 本来の右→左の進行を使う。
  */
 
+/*
+ * 縦に積む。grid-template-rows で段を数え上げると、断り書きのような行を
+ * 1つ足しただけで本文の段が 1fr を失って潰れる。
+ * 本文だけが伸び、ほかは中身なりという関係を flex で直接書く。
+ */
 .reader {
-  display: grid;
-  grid-template-rows: auto 1fr auto;
+  display: flex;
+  flex-direction: column;
   block-size: 100%;
 }
+.reader > .toolbar,
+.reader > .status,
+.reader > .stale-parse { flex: none; }
 
 /*
  * 操作系はすべてこの1段に収める。macOS のツールバーとして扱うので、
@@ -57,7 +65,17 @@
 }
 .share-menu button { text-align: start; white-space: nowrap; background: transparent; border: 0; }
 
-.reader-body { display: flex; min-block-size: 0; }
+/* 作り直せない本の断り書き。読書の邪魔にならない高さに抑える。 */
+.stale-parse {
+  margin: 0;
+  padding: 0.5em 1em;
+  font-size: 0.85em;
+  color: var(--secondary);
+  background: var(--surface, transparent);
+  border-block-end: 1px solid var(--border);
+}
+
+.reader-body { display: flex; flex: 1; min-block-size: 0; }
 
 .sidebar {
   inline-size: 250px;
