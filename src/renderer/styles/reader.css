@@ -273,6 +273,22 @@
   height: auto;
   margin-inline: auto;
 }
+/*
+ * 行なかの画像。数式・楽譜・梵字・神代文字など、字形の代わりに置かれたもの。
+ *
+ * 行をまたぐ方向(block 軸)の大きさだけを抑える。横書きなら高さ、縦書きなら幅で、
+ * 論理方向で書けば書字方向を問わず「行の太さ」を抑えることになる。
+ * 2em を超えると隣の行に食い込む。実測の行なか画像は 16〜53px なので、
+ * 本文 24px ならほとんどが原寸のまま収まる。
+ *
+ * vertical-align は既定(baseline)のまま。行なか数式画像の慣習的な置き方で、
+ * 縦書きでも字の並びから浮かない。
+ */
+.image-inline {
+  max-block-size: 2em;
+  max-inline-size: 100%;
+}
+
 .image-placeholder {
   display: inline-block;
   padding: 0.6em 1em;

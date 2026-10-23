@@ -5,7 +5,7 @@ import { memo, useState, type JSX } from 'react'
 import type { Block } from '@shared/model/document'
 import { bookImageUrl } from '@shared/ipc'
 import { ATTR_BLOCK, ATTR_CHAPTER } from './dom/contract'
-import { renderInline } from './InlineRenderer'
+import { renderInline, type InlineContext } from './InlineRenderer'
 
 interface Props {
   block: Block
@@ -61,6 +61,7 @@ function Figure({ block, bookId, onImageLoad }: Omit<Props, 'chapterId'>): JSX.E
 }
 
 function BlockRendererImpl({ block, chapterId, bookId, onImageLoad }: Props): JSX.Element {
+  const inline: InlineContext = { bookId, ...(onImageLoad ? { onImageLoad } : {}) }
   const common = {
     [ATTR_BLOCK]: block.id,
     [ATTR_CHAPTER]: chapterId,
@@ -75,7 +76,7 @@ function BlockRendererImpl({ block, chapterId, bookId, onImageLoad }: Props): JS
       const Tag = (['h2', 'h3', 'h4'] as const)[(block.headingLevel ?? 1) - 1] ?? 'h3'
       return (
         <Tag {...common} className={`blk head head-${block.headingLevel ?? 1}`}>
-          {renderInline(block.children)}
+          {renderInline(block.children, inline)}
         </Tag>
       )
     }
@@ -103,14 +104,14 @@ function BlockRendererImpl({ block, chapterId, bookId, onImageLoad }: Props): JS
     case 'caption':
       return (
         <p {...common} className="blk caption">
-          {renderInline(block.children)}
+          {renderInline(block.children, inline)}
         </p>
       )
 
     case 'quote':
       return (
         <blockquote {...common} className="blk quote">
-          {renderInline(block.children)}
+          {renderInline(block.children, inline)}
         </blockquote>
       )
 
@@ -120,7 +121,7 @@ function BlockRendererImpl({ block, chapterId, bookId, onImageLoad }: Props): JS
       }
       return (
         <p {...common} className="blk para">
-          {renderInline(block.children)}
+          {renderInline(block.children, inline)}
         </p>
       )
   }

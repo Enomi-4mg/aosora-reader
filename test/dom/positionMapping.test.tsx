@@ -50,6 +50,22 @@ describe('DOM規約', () => {
     expect(covered).toBe(block.plainText.length)
   })
 
+  /*
+   * 行なか画像は note と同じくゼロ幅。run を持たせると plainText と DOM の
+   * 対応が崩れ、ハイライトと読書位置がまとめてずれる。
+   */
+  it('行なか画像は run を持たず、座標を消費しない', () => {
+    const { block, el } = render(
+      '　酒精の温度［＃Ｔ＿０の数式（fig_28.png、横20×縦17）入る］を測った。'
+    )
+    const img = el.querySelector('img.image-inline')!
+    expect(img.closest(SELECTOR_RUN)).toBeNull()
+    expect(block.plainText).toBe('　酒精の温度を測った。')
+    const covered = Array.from(el.querySelectorAll(SELECTOR_RUN))
+      .reduce((n, run) => n + runTextLength(run), 0)
+    expect(covered).toBe(block.plainText.length)
+  })
+
   it('ルビの読みは run の長さに数えない', () => {
     const { el } = render('吾輩《わがはい》')
     const ruby = el.querySelector('ruby')!
@@ -69,6 +85,11 @@ describe('全オフセットの往復', () => {
     ['サロゲートペア外字', '　※［＃「口＋七」、第3水準1-47-52］る。'],
     ['縦中横', '　明治４２［＃「４２」は縦中横］年。'],
     ['未対応注記', '　本文［＃地から３字上げ］の続き。'],
+    ['行なか画像', '　酒精の温度［＃Ｔ＿０の数式（fig_28.png、横20×縦17）入る］を測った。'],
+    [
+      '行なか画像と装飾',
+      '　［＃ここから傍点］あ［＃ｓの数式（f.png、横1×縦1）入る］い［＃ここで傍点終わり］。'
+    ],
     [
       '複合',
       '　吾輩《わがはい》は※［＃ローマ数字2、1-13-22］の大事［＃「大事」に傍点］な４２［＃「４２」は縦中横］匹目。'

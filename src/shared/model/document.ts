@@ -122,6 +122,28 @@ export interface NoteNode {
   raw: string
 }
 
+/**
+ * 行なかに置かれた画像。
+ *
+ * 青空文庫の画像注記の半分近くは挿絵ではなく、本文の途中に字形の代わりとして
+ * 埋め込まれた画像(数式・楽譜・梵字・神代文字)である。
+ *
+ * note と同じく必ずゼロ幅 (start === end)。plainText を一切消費しないので、
+ * 検索・ハイライト・読了率に影響しない(不変条件 A)。文字を1つ入れて
+ * 代用すると、その1文字が検索にも読み上げにも出てしまう。
+ */
+export interface ImageNode {
+  kind: 'image'
+  start: number
+  end: number
+  /** ZIP 同梱画像のファイル名。 */
+  src: string
+  /** 代替表示とアクセシブル名。 */
+  alt: string
+  width?: number
+  height?: number
+}
+
 export type InlineNode =
   | TextNode
   | RubyNode
@@ -131,6 +153,7 @@ export type InlineNode =
   | GaijiNode
   | TcyNode
   | NoteNode
+  | ImageNode
 
 /** children を持つ(入れ子可能な)ノードか。 */
 export function isContainerNode(

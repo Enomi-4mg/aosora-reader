@@ -187,6 +187,7 @@ function buildChapters(
     let pageBreak = false
     let rule = false
     let image: BlockDraft['image']
+    let imageCount = 0
     let headingForThisLine: 1 | 2 | 3 | null = null
     let headingEnds = false
     let isCaption = false
@@ -200,6 +201,7 @@ function buildChapters(
           rule = true
           break
         case 'image':
+          imageCount++
           image = {
             src: d.annotation.src,
             alt: d.annotation.alt,
@@ -250,7 +252,19 @@ function buildChapters(
       drafts.push(emptyDraft('horizontalRule', srcOff, sourceEnd))
       continue
     }
-    if (image && plainText === '') {
+    /*
+     * 画像をブロックにするのは「その行が画像1枚だけ」のときに限る。
+     *
+     * 本文と同じ行にある画像は挿絵ではなく、字形の代わりに置かれた画像
+     * (数式・楽譜・梵字・神代文字)であることがほとんどで、実測では
+     * 全 5,109 件のうち 855 件がこの形。行ごとブロックにすると本文が消えるし、
+     * 捨てると画像が消える。どちらでもなく、行なかのゼロ幅ノードとして
+     * children に残す(parseInline が既に積んでいる)。
+     *
+     * 1行に複数枚ある行(実測 124 行)も同じ。ブロックは1枚しか持てないので、
+     * ここでブロックにすると最後の1枚以外が失われる。
+     */
+    if (image && imageCount === 1 && plainText === '') {
       drafts.push({
         type: 'image',
         children: [],

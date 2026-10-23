@@ -8,6 +8,7 @@
  */
 import type {
   EmphasisNode,
+  ImageNode,
   InlineNode,
   BoldNode,
   NoteNode,
@@ -26,6 +27,9 @@ interface Span {
   end: number
   decoration: Decoration
 }
+
+/** 座標を消費しない(ゼロ幅の)ノード。本文の切れ目に差し込む。 */
+type ZeroWidthNode = NoteNode | ImageNode
 
 /**
  * open から始まる ［＃ … ］ の、対応する ］ の位置を返す。入れ子に対応する。
@@ -118,7 +122,7 @@ export function parseInline(
 ): InlineParseResult {
   let plain = ''
   const leaves: InlineNode[] = []
-  const notes: NoteNode[] = []
+  const zeroWidth: ZeroWidthNode[] = []
   const spans: Span[] = []
   const directives: Directive[] = []
 
@@ -233,7 +237,7 @@ export function parseInline(
     }
   }
 
-  const children = assemble(plain, leaves, notes, spans, issues, sourceOffset)
+  const children = assemble(plain, leaves, zeroWidth, spans, issues, sourceOffset)
   return {
     plainText: plain,
     children,
@@ -307,7 +311,25 @@ export function parseInline(
       }
       case 'unknown':
         issues.add('unknown-annotation', `未対応の注記: ${body}`, srcOff, body)
-        notes.push({ kind: 'note', start: plain.length, end: plain.length, raw: body })
+        zeroWidth.push({ kind: 'note', start: plain.length, end: plain.length, raw: body })
+        return
+      case 'image':
+        /*
+         * 画像はブロックにも行なかにもなりうる。どちらかは行全体を見ないと
+         * 決まらないので、ここでは両方の材料を残す:
+         * ゼロ幅ノード(行なか用)と directive(ブロック用)。
+         * 選ぶのはブロック組み立て側。
+         */
+        zeroWidth.push({
+          kind: 'image',
+          start: plain.length,
+          end: plain.length,
+          src: anno.src,
+          alt: anno.alt,
+          ...(anno.width !== undefined ? { width: anno.width } : {}),
+          ...(anno.height !== undefined ? { height: anno.height } : {})
+        })
+        directives.push({ annotation: anno, offset: plain.length })
         return
       default:
         // ブロック側で処理する注記
@@ -321,12 +343,15 @@ export function parseInline(
 function assemble(
   plain: string,
   leaves: InlineNode[],
-  notes: NoteNode[],
+  zeroWidth: ZeroWidthNode[],
   rawSpans: Span[],
   issues: IssueCollector,
   sourceOffset: number
 ): InlineNode[] {
-  let sorted = [...leaves].sort((a, b) => a.start - b.start || a.end - b.end)
+  let sorted = splitTextAt(
+    [...leaves].sort((a, b) => a.start - b.start || a.end - b.end),
+    zeroWidth.map((n) => n.start)
+  )
   const spans = clampSpans(rawSpans, sorted).sort(
     (a, b) => a.start - b.start || b.end - a.end
   )
@@ -377,7 +402,7 @@ function assemble(
   detectCrossings(styleSpans, issues, sourceOffset)
 
   const tree = build(styleSpans, 0, plain.length)
-  return mergeNotes(tree, notes)
+  return mergeZeroWidth(tree, zeroWidth)
 
   function build(pool: Span[], from: number, to: number): InlineNode[] {
     const out: InlineNode[] = []
@@ -416,6 +441,46 @@ function assemble(
     }
     return out
   }
+}
+
+/**
+ * 指定オフセットでテキスト leaf を割る。
+ *
+ * pushText は隣り合うテキストを1つの leaf にまとめるので、行なかにゼロ幅ノードが
+ * あっても leaf の切れ目はできない。切れ目が無いと mergeZeroWidth は
+ * 「その leaf の前か後ろ」にしか置けず、行なか画像が本文の途中ではなく
+ * 段落の末尾に固まって並ぶ。数式が文から外れて3つ続けて出る、という形で現れる。
+ *
+ * ルビ・外字・縦中横は原子的なので割らない。
+ */
+function splitTextAt(leaves: InlineNode[], offsets: number[]): InlineNode[] {
+  const cuts = [...new Set(offsets)].sort((a, b) => a - b)
+  if (cuts.length === 0) return leaves
+  const out: InlineNode[] = []
+  for (const leaf of leaves) {
+    if (leaf.kind !== 'text') {
+      out.push(leaf)
+      continue
+    }
+    let start = leaf.start
+    for (const cut of cuts) {
+      if (cut <= start || cut >= leaf.end) continue
+      out.push({
+        kind: 'text',
+        start,
+        end: cut,
+        text: leaf.text.slice(start - leaf.start, cut - leaf.start)
+      })
+      start = cut
+    }
+    out.push({
+      kind: 'text',
+      start,
+      end: leaf.end,
+      text: leaf.text.slice(start - leaf.start)
+    })
+  }
+  return out
 }
 
 function container(s: Span, children: InlineNode[]): InlineNode {
@@ -461,10 +526,10 @@ function detectCrossings(spans: Span[], issues: IssueCollector, sourceOffset: nu
 }
 
 /** ゼロ幅の note をオフセット順にトップレベルへ差し込む。 */
-function mergeNotes(tree: InlineNode[], notes: NoteNode[]): InlineNode[] {
-  if (notes.length === 0) return tree
+function mergeZeroWidth(tree: InlineNode[], zeroWidth: ZeroWidthNode[]): InlineNode[] {
+  if (zeroWidth.length === 0) return tree
   const out: InlineNode[] = []
-  const queue = [...notes].sort((a, b) => a.start - b.start)
+  const queue = [...zeroWidth].sort((a, b) => a.start - b.start)
   for (const node of tree) {
     while (queue.length > 0 && queue[0]!.start <= node.start) out.push(queue.shift()!)
     out.push(node)

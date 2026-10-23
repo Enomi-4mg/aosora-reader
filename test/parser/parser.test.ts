@@ -433,6 +433,78 @@ describe('注記の入れ子', () => {
   })
 })
 
+describe('行なかの画像', () => {
+  /*
+   * 本文と同じ行にある画像は挿絵ではなく字形の代わり(数式・神代文字など)。
+   * 実測で 5,109 件中 855 件。行ごとブロックにすると本文が消え、
+   * 捨てると画像が消えるので、ゼロ幅のインラインノードとして残す。
+   */
+  it('本文と同じ行の画像をゼロ幅ノードとして残す', () => {
+    const b = firstBlock('　酒精の温度［＃Ｔ＿０の数式（fig_28.png、横20×縦17）入る］を測った。')
+    expect(b.type).toBe('paragraph')
+    expect(b.plainText).toBe('　酒精の温度を測った。')
+    const img = b.children.find((n) => n.kind === 'image')!
+    expect(img).toMatchObject({ kind: 'image', src: 'fig_28.png', alt: 'Ｔ＿０の数式', width: 20, height: 17 })
+    // ゼロ幅であること。1文字でも消費すると検索と読了率が汚れる(不変条件 A)
+    expect(img.start).toBe(img.end)
+    expect(img.start).toBe('　酒精の温度'.length)
+    assertOffsetsConsistent(b)
+  })
+
+  /*
+   * pushText は隣り合うテキストを1つの leaf にまとめるので、切れ目を作らないと
+   * 画像が本文の途中ではなく段落の末尾に固まって並ぶ。
+   * 「在るか」ではなく「どこに在るか」を見ないと気づけない。
+   */
+  it('行なか画像が本文の正しい位置に入る', () => {
+    const b = firstBlock(
+      '　比［＃ｓの数式（a.png、横1×縦1）入る］を採り［＃Ｔの数式（b.png、横1×縦1）入る］で割る。'
+    )
+    expect(b.plainText).toBe('　比を採りで割る。')
+    // text と image が交互に現れ、画像が末尾に寄っていないこと
+    expect(b.children.map((n) => n.kind)).toEqual(['text', 'image', 'text', 'image', 'text'])
+    const imgs = b.children.filter((n) => n.kind === 'image') as Array<{ start: number; src: string }>
+    expect(imgs[0]!.start).toBe('　比'.length)
+    expect(imgs[1]!.start).toBe('　比を採り'.length)
+    expect(imgs.map((n) => n.src)).toEqual(['a.png', 'b.png'])
+    assertOffsetsConsistent(b)
+  })
+
+  it('1行に複数の画像があっても取りこぼさない', () => {
+    const b = firstBlock(
+      '　［＃神代文字マ（fig_33.png、横20×縦18）入る］［＃神代文字ト（fig_21.png、横20×縦18）入る］'
+    )
+    const imgs = b.children.filter((n) => n.kind === 'image')
+    expect(imgs.map((n) => (n as { src: string }).src)).toEqual(['fig_33.png', 'fig_21.png'])
+    expect(b.plainText).toBe('　')
+  })
+
+  it('画像1枚だけの行はこれまでどおり画像ブロックになる', () => {
+    const r = parseBody('［＃挿絵（fig_01.png、横10×縦20）入る］')
+    const blocks = r.chapters.flatMap((c) => c.blocks)
+    const img = blocks.find((b) => b.type === 'image')!
+    expect(img.image!.src).toBe('fig_01.png')
+    expect(img.children).toEqual([])
+  })
+
+  it('本文の無い行に画像が複数あればインラインとして残す', () => {
+    const r = parseBody('［＃挿絵（a.png、横1×縦1）入る］［＃挿絵（b.png、横1×縦1）入る］')
+    const blocks = r.chapters.flatMap((c) => c.blocks)
+    expect(blocks.some((b) => b.type === 'image')).toBe(false)
+    const imgs = blocks.flatMap((b) => b.children).filter((n) => n.kind === 'image')
+    expect(imgs.map((n) => (n as { src: string }).src)).toEqual(['a.png', 'b.png'])
+  })
+
+  it('行なか画像は装飾の中でも保持される', () => {
+    const b = firstBlock('　［＃ここから傍点］あ［＃ｓの数式（f.png、横1×縦1）入る］い［＃ここで傍点終わり］')
+    const flat = (ns: InlineNode[]): InlineNode[] =>
+      ns.flatMap((n) => ('children' in n ? [n, ...flat(n.children)] : [n]))
+    expect(flat(b.children).some((n) => n.kind === 'image')).toBe(true)
+    expect(b.plainText).toBe('　あい')
+    assertOffsetsConsistent(b)
+  })
+})
+
 describe('不正注記 / 頑健性', () => {
   it('未対応注記はゼロ幅 note として保持し本文を壊さない', () => {
     const b = firstBlock('　本文［＃地から３字上げ］の続き')
