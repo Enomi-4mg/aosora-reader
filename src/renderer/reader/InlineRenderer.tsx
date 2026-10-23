@@ -5,8 +5,8 @@
  * 各 run に data-run / data-s を付ける(dom/contract.ts の規約)。
  * これにより DOM から plainText オフセットを求める処理が一箇所で完結する。
  */
-import type { JSX } from 'react'
-import type { ImageNode, InlineNode } from '@shared/model/document'
+import { useState, type JSX } from 'react'
+import type { GaijiNode, ImageNode, InlineNode } from '@shared/model/document'
 import { bookImageUrl } from '@shared/ipc'
 import { ATTR_RUN, ATTR_START } from './dom/contract'
 
@@ -63,6 +63,47 @@ function InlineFigure({ node, ctx }: { node: ImageNode; ctx: InlineContext }): J
   )
 }
 
+/**
+ * 画像で与えられた外字。篆書や梵字など、Unicode に無い字形。
+ *
+ * 外字は本文の1文字を占める(plainText に代替文字が入っている)。ここが
+ * 行なか画像との決定的な違いで、文字を DOM から取り除いてはいけない。
+ * 取り除くと run の長さが Document Model と食い違い、ハイライトと読書位置が
+ * まとめてずれる(dom/contract.ts の規約)。
+ *
+ * そこで代替文字は必ず DOM に残したまま隠し、画像が読めなかったときだけ見せる。
+ * img はテキストノードを持たないので、走査には一切影響しない。
+ */
+/**
+ * 画像外字の代替テキスト。注記からファイル名と面区点を落とす。
+ * 注記をそのまま渡すと読み上げが「かっこ fig42345_01 ドット png」まで読む。
+ */
+function gaijiAlt(description: string): string {
+  const head = description.split('（')[0]!.trim()
+  return head === '' ? '外字' : head
+}
+
+function GaijiGlyph({ node, ctx }: { node: GaijiNode; ctx: InlineContext }): JSX.Element {
+  const [failed, setFailed] = useState(false)
+  if (node.src === undefined || failed) return <>{node.text}</>
+  return (
+    <>
+      <img
+        className="image-gaiji"
+        src={bookImageUrl(ctx.bookId, node.src)}
+        alt={gaijiAlt(node.description)}
+        decoding="async"
+        draggable={false}
+        onError={() => setFailed(true)}
+        onLoad={ctx.onImageLoad}
+      />
+      <span className="gaiji-standin" aria-hidden="true">
+        {node.text}
+      </span>
+    </>
+  )
+}
+
 export function renderInline(
   nodes: InlineNode[],
   ctx: InlineContext,
@@ -100,7 +141,7 @@ export function renderInline(
             title={n.description}
             data-gaiji={n.resolution}
           >
-            {n.text}
+            {n.resolution === 'image' ? <GaijiGlyph node={n} ctx={ctx} /> : n.text}
           </span>
         )
         break

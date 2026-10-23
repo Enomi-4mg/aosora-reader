@@ -66,6 +66,21 @@ describe('DOM規約', () => {
     expect(covered).toBe(block.plainText.length)
   })
 
+  /*
+   * 画像で与えられた外字は本文の1文字を占める(plainText に代替文字が入る)。
+   * 画像に差し替えても run の長さが変わってはいけない。
+   */
+  it('画像の外字でも run の長さは1文字のまま', () => {
+    const { block, el } = render('　※［＃「册」の篆書（fig_01.png）、70-3］の字。')
+    const run = el.querySelector('[data-gaiji="image"]')!
+    expect(run.querySelector('img')).not.toBeNull()
+    expect(runTextLength(run)).toBe(1)
+    expect(block.plainText).toBe('　□の字。')
+    const covered = Array.from(el.querySelectorAll(SELECTOR_RUN))
+      .reduce((n, r) => n + runTextLength(r), 0)
+    expect(covered).toBe(block.plainText.length)
+  })
+
   it('ルビの読みは run の長さに数えない', () => {
     const { el } = render('吾輩《わがはい》')
     const ruby = el.querySelector('ruby')!
@@ -86,6 +101,7 @@ describe('全オフセットの往復', () => {
     ['縦中横', '　明治４２［＃「４２」は縦中横］年。'],
     ['未対応注記', '　本文［＃地から３字上げ］の続き。'],
     ['行なか画像', '　酒精の温度［＃Ｔ＿０の数式（fig_28.png、横20×縦17）入る］を測った。'],
+    ['画像の外字', '　※［＃「册」の篆書（fig_01.png）、70-3］の字。'],
     [
       '行なか画像と装飾',
       '　［＃ここから傍点］あ［＃ｓの数式（f.png、横1×縦1）入る］い［＃ここで傍点終わり］。'

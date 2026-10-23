@@ -289,6 +289,23 @@
   max-inline-size: 100%;
 }
 
+/*
+ * 画像で与えられた外字(篆書・梵字など)。本文の1文字として組む。
+ * 論理方向で書けば、横書きでは高さ、縦書きでは幅が1文字ぶんになる。
+ */
+.image-gaiji {
+  block-size: 1em;
+  inline-size: auto;
+}
+
+/*
+ * 画像が出ているときの代替文字。
+ *
+ * display: none でも DOM には残り、走査は firstChild を辿るので run の長さは
+ * 変わらない。消してしまうと Document Model と食い違う。
+ */
+.gaiji-standin { display: none; }
+
 .image-placeholder {
   display: inline-block;
   padding: 0.6em 1em;

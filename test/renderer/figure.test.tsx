@@ -139,6 +139,40 @@ describe('挿絵の描画', () => {
     expect(body.querySelector('.image-placeholder')!.textContent).toBe('挿絵')
   })
 
+  it('画像で与えられた外字を img として描く', () => {
+    const blocks = blocksOf('　※［＃「册」の篆書（fig_01.png）、70-3］の字。')
+    const body = render(blocks)
+    const img = body.querySelector('img.image-gaiji')!
+    expect(img.getAttribute('src')).toBe(`${IMAGE_SCHEME}://${BOOK}/fig_01.png`)
+    // 読み上げにファイル名と面区点を載せない
+    expect(img.getAttribute('alt')).toBe('「册」の篆書')
+    // 代替文字は隠すだけで DOM からは消さない
+    expect(body.querySelector('.gaiji-standin')!.textContent).toBe('□')
+  })
+
+  it('画像にできない外字はこれまでどおり文字で出す', () => {
+    const body = render(blocksOf('　※［＃ローマ数字1、1-13-21］の巻。'))
+    expect(body.querySelector('img.image-gaiji')).toBeNull()
+    expect(body.querySelector('[data-gaiji]')!.textContent).toBe('Ⅰ')
+  })
+
+  it('外字の画像が読めなければ代替文字を見せる', () => {
+    const glyph = blocksOf('　※［＃「册」の篆書（fig_01.png）、70-3］の字。')
+      .find((b) => b.plainText !== '')!
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    act(() => {
+      root.render(<BlockRenderer block={glyph} chapterId="c0" bookId={BOOK} />)
+    })
+    act(() => {
+      container.querySelector('img.image-gaiji')!.dispatchEvent(new Event('error'))
+    })
+    expect(container.querySelector('img.image-gaiji')).toBeNull()
+    expect(container.querySelector('[data-gaiji]')!.textContent).toBe('□')
+    act(() => root.unmount())
+  })
+
   it('URL の組み立てでファイル名をエスケープする', () => {
     expect(bookImageUrl(BOOK, 'fig 01.png')).toBe(
       `${IMAGE_SCHEME}://${BOOK}/fig%2001.png`
