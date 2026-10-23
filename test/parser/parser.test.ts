@@ -390,6 +390,49 @@ describe('改ページ / 画像 / 罫線', () => {
   })
 })
 
+describe('注記の入れ子', () => {
+  /*
+   * 最初の ］ で閉じると、残りが本文として plainText に流れ込む。
+   * 実測で 12 作品・821 件がこの形で、『日本その日その日』では 768 行が汚れていた。
+   */
+  it('入れ子の注記で本文が汚れない(縦中横)', () => {
+    const r = parseBody(
+      '［＃「図‐10［＃「10」は縦中横］」のキャプション付きの図（fig_010.png、横496×縦200）入る］'
+    )
+    const blocks = r.chapters.flatMap((c) => c.blocks)
+    expect(blocks.every((b) => !/入る］|のキャプション付き|\.png/.test(b.plainText))).toBe(true)
+    const img = blocks.find((b) => b.type === 'image')!
+    expect(img.image).toMatchObject({ src: 'fig_010.png', width: 496, height: 200 })
+  })
+
+  it('入れ子の注記で本文が汚れない(外字)', () => {
+    const r = parseBody(
+      '［＃「※［＃ローマ数字1、1-13-21］」のキャプション付きの図（fig_001.png、横313×縦305）入る］'
+    )
+    const blocks = r.chapters.flatMap((c) => c.blocks)
+    expect(blocks.every((b) => !/入る］|のキャプション付き|\.png/.test(b.plainText))).toBe(true)
+    expect(blocks.find((b) => b.type === 'image')!.image!.src).toBe('fig_001.png')
+  })
+
+  /** 縦中横は組み方の指定で、対象の文字は手前に地の文として在る。外字は文字そのもの。 */
+  it('キャプションから入れ子の注記を均す', () => {
+    const caption = (body: string): string | undefined =>
+      parseBody(body).chapters
+        .flatMap((c) => c.blocks)
+        .find((b) => b.type === 'image')!.image!.caption
+
+    expect(caption('［＃「図‐10［＃「10」は縦中横］」のキャプション付きの図（f.png、横1×縦1）入る］'))
+      .toBe('図‐10')
+    expect(caption('［＃「※［＃ローマ数字1、1-13-21］」のキャプション付きの図（f.png、横1×縦1）入る］'))
+      .toBe('Ⅰ')
+  })
+
+  it('釣り合わない注記でも本文を失わない', () => {
+    const b = firstBlock('　前［＃「X」は不明な注記の続き\n')
+    expect(b.plainText.startsWith('　前')).toBe(true)
+  })
+})
+
 describe('不正注記 / 頑健性', () => {
   it('未対応注記はゼロ幅 note として保持し本文を壊さない', () => {
     const b = firstBlock('　本文［＃地から３字上げ］の続き')

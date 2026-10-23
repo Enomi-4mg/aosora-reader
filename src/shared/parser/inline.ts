@@ -27,6 +27,35 @@ interface Span {
   decoration: Decoration
 }
 
+/**
+ * open から始まる ［＃ … ］ の、対応する ］ の位置を返す。入れ子に対応する。
+ *
+ *   ［＃「図‐10［＃「10」は縦中横］」のキャプション付きの図（fig.png）入る］
+ *   ［＃「※［＃ローマ数字1、1-13-21］」のキャプション付きの図（fig.png）入る］
+ *
+ * 最初の ］ で閉じると注記が途中で切れ、残り(「」のキャプション付きの図（…）入る］)が
+ * 本文として plainText に流れ込む。座標空間そのものが注記の生テキストで汚れるため、
+ * 検索も読了率も読み上げも巻き添えになる(不変条件 A)。
+ * 実測では 12 作品・821 件がこの形をしている。
+ *
+ * 釣り合いが取れない注記では最初の ］ を返し、従来の振る舞いに落とす。
+ */
+function findAnnotationClose(line: string, open: number): number {
+  let depth = 0
+  for (let i = open; i < line.length; i++) {
+    if (line.startsWith(ANNO_OPEN, i)) {
+      depth++
+      i += ANNO_OPEN.length - 1
+      continue
+    }
+    if (line[i] === ANNO_CLOSE) {
+      depth--
+      if (depth === 0) return i
+    }
+  }
+  return line.indexOf(ANNO_CLOSE, open)
+}
+
 /** 行の外側(ブロック組み立て側)が処理すべき注記。 */
 export interface Directive {
   annotation: Annotation
@@ -119,7 +148,7 @@ export function parseInline(
     // --- エスケープ / 外字 ---
     if (ch === '※') {
       if (line.startsWith(ANNO_OPEN, i + 1)) {
-        const close = line.indexOf(ANNO_CLOSE, i + 1)
+        const close = findAnnotationClose(line, i + 1)
         if (close === -1) {
           issues.add('malformed-annotation', '外字注記が閉じていない', sourceOffset + i, line.slice(i))
           pushText(ch)
@@ -151,7 +180,7 @@ export function parseInline(
 
     // --- 注記 ---
     if (line.startsWith(ANNO_OPEN, i)) {
-      const close = line.indexOf(ANNO_CLOSE, i)
+      const close = findAnnotationClose(line, i)
       if (close === -1) {
         issues.add('malformed-annotation', '注記が閉じていない', sourceOffset + i, line.slice(i))
         pushText(ch)

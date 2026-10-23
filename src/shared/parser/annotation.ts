@@ -6,7 +6,7 @@
  * Renderer 側は Document Model しか見なくて済むようにする。
  */
 import type { EmphasisMark, UnderlineStyle } from '../model/document'
-import { toHalfWidthDigits } from './gaiji'
+import { resolveGaiji, toHalfWidthDigits } from './gaiji'
 
 /** 装飾の種類。範囲指定・対象指定のどちらの形でも同じ値になる。 */
 export type DecorationKind = 'emphasis' | 'bold' | 'underline' | 'tcy'
@@ -204,7 +204,7 @@ export function classifyAnnotation(body: string): Annotation {
  * 丸括弧の前までが説明にあたる。
  */
 function describeImage(body: string): { alt: string; caption?: string } {
-  const head = body
+  const head = flattenInnerAnnotations(body)
     .replace(/入る[。．]?$/, '')
     .replace(/（[^（）]*）\s*$/, '')
     .trim()
@@ -218,4 +218,19 @@ function describeImage(body: string): { alt: string; caption?: string } {
   if (described) return { alt: described[1]! }
 
   return { alt: head === '' ? '挿絵' : head }
+}
+
+/**
+ * 注記の中に入った注記を、人が読める文字列に均す。
+ *
+ * キャプションには注記が入れ子になることがある。実測で多いのは2種類:
+ *   「図‐10［＃「10」は縦中横］」  → 縦中横は組み方の指定で、対象の「10」は
+ *                                    すでに手前に地の文として在る。落とせばよい。
+ *   「※［＃ローマ数字1、1-13-21］」 → 外字はその文字そのもの。落とすと中身が消える。
+ *                                    文字に解決してから埋める。
+ */
+function flattenInnerAnnotations(body: string): string {
+  return body
+    .replace(/※［＃([^［］]*)］/g, (_match, inner: string) => resolveGaiji(inner).text)
+    .replace(/［＃[^［］]*］/g, '')
 }
