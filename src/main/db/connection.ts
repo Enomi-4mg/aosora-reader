@@ -8,18 +8,52 @@ import { MIGRATIONS } from './migrations'
 
 export type Db = DatabaseSync
 
+/** この版が扱えるスキーマの最大版。 */
+export const SCHEMA_VERSION = MIGRATIONS.reduce((max, m) => Math.max(max, m.version), 0)
+
+/**
+ * ライブラリが、このアプリより新しい版で作られていた。
+ *
+ * 配布を始めると、新しい版を一度入れたあとで古い版に戻すことが普通に起こる。
+ * (インストーラを取り直した、別の端末から古い版をコピーした、など)
+ * MIGRATIONS は前方にしか進まないので、古い版はそのスキーマへ移行できない。
+ * それでも起動だけはできてしまうのが危ないところで、知らないカラムを無視したまま
+ * 書き込みが走ると、新しい版へ戻したときに取り返せない。黙って進むより止める。
+ */
+export class SchemaTooNewError extends Error {
+  constructor(
+    readonly found: number,
+    readonly supported: number
+  ) {
+    super(
+      `この本棚は新しい版の青空Readerで作られています` +
+        `(データ版 ${found} / この版が読めるのは ${supported} まで)。` +
+        `青空Readerを最新版に更新してから開いてください。`
+    )
+    this.name = 'SchemaTooNewError'
+  }
+}
+
 export function openDatabase(filename: string): Db {
   const db = new DatabaseSync(filename)
-  db.exec('PRAGMA journal_mode = WAL')
-  db.exec('PRAGMA foreign_keys = ON')
-  db.exec('PRAGMA synchronous = NORMAL')
-  migrate(db)
+  try {
+    // PRAGMA を当てる前に見る。開けないと分かっているファイルは触らない。
+    assertNotNewer(db)
+    db.exec('PRAGMA journal_mode = WAL')
+    db.exec('PRAGMA foreign_keys = ON')
+    db.exec('PRAGMA synchronous = NORMAL')
+    migrate(db)
+  } catch (e) {
+    // 開いたままだと WAL のロックが残る。閉じてから投げ直す。
+    db.close()
+    throw e
+  }
   return db
 }
 
 export function migrate(db: Db): void {
-  const row = db.prepare('PRAGMA user_version').get() as { user_version: number }
-  const current = row?.user_version ?? 0
+  const current = userVersion(db)
+  assertNotNewer(db)
 
   for (const m of MIGRATIONS) {
     if (m.version <= current) continue
@@ -37,6 +71,16 @@ export function migrate(db: Db): void {
       )
     }
   }
+}
+
+function userVersion(db: Db): number {
+  const row = db.prepare('PRAGMA user_version').get() as { user_version: number }
+  return row?.user_version ?? 0
+}
+
+function assertNotNewer(db: Db): void {
+  const current = userVersion(db)
+  if (current > SCHEMA_VERSION) throw new SchemaTooNewError(current, SCHEMA_VERSION)
 }
 
 /** 複数の書き込みを1トランザクションにまとめる。 */

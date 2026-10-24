@@ -5,7 +5,7 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, net, proto
 import { join } from 'node:path'
 import { DEFAULT_APP_SETTINGS, DEFAULT_SETTINGS, normalizeAppSettings, normalizeSettings, type AppSettings, type ReaderSettings } from '@shared/model/settings'
 import type { AozoraIpcApi, ImportOutcome, OpenBookResult } from '@shared/ipc'
-import { openDatabase, type Db } from './db/connection'
+import { openDatabase, SchemaTooNewError, type Db } from './db/connection'
 import { BookRepository } from './repositories/BookRepository'
 import { ProgressRepository } from './repositories/ProgressRepository'
 import { SettingsRepository } from './repositories/SettingsRepository'
@@ -400,8 +400,27 @@ function registerImageProtocol(): void {
   })
 }
 
+/**
+ * 本棚を開けないまま起動すると、空の本棚を見せたうえに上書きしかねない。
+ * 理由を見せて終わるほうが安全なので、ここで止める。
+ */
+function reportFatal(e: unknown): void {
+  const detail =
+    e instanceof SchemaTooNewError
+      ? e.message
+      : `本棚を開けませんでした。\n\n${e instanceof Error ? e.message : String(e)}\n\n` +
+        `データの場所: ${app.getPath('userData')}`
+  dialog.showErrorBox('青空Readerを起動できません', detail)
+}
+
 app.whenReady().then(() => {
-  initServices()
+  try {
+    initServices()
+  } catch (e) {
+    reportFatal(e)
+    app.quit()
+    return
+  }
   registerImageProtocol()
   registerIpc()
   createWindow()
