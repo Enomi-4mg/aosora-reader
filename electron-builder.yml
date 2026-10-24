@@ -1,5 +1,8 @@
 appId: jp.miyashu.aosora-reader
 productName: 青空Reader
+# 配布物のファイル名は ASCII にする。日本語のままだと、配信の経路や展開ツールに
+# よっては文字化けした名前で保存される。表示名は productName が持つので困らない。
+artifactName: ${name}-${version}-${arch}.${ext}
 directories:
   output: dist
   buildResources: resources
@@ -11,3 +14,15 @@ mac:
     - dmg
   category: public.app-category.book
   darkModeSupport: true
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  # ユーザー単位に入れる。管理者権限を求めないので UAC が出ない。
+  perMachine: false
+  # 既定のまま一気に進めず、インストール先を選べる画面を出す。
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: 青空Reader
