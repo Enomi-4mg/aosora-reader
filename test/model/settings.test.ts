@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  appSettingsFromRaw,
+  appSettingsToRaw,
   DEFAULT_SETTINGS,
   DEFAULT_APP_SETTINGS,
+  type AppSettings,
   FONT_SIZE_MAX,
   FONT_STACKS,
   LINE_HEIGHT_MIN,
@@ -77,5 +80,47 @@ describe('書体の読み替え', () => {
   it('追加フォントなど知らない値はそのまま通す', () => {
     const custom = '"Aozora Custom 11111111-2222-3333-4444-555555555555"'
     expect(normalizeSettings({ fontFamily: custom }).fontFamily).toBe(custom)
+  })
+})
+
+describe('アプリ設定の保存と読み戻し', () => {
+  it('全項目が往復する', () => {
+    // 項目を足したときに読み出し側へ足し忘れると、保存できるのに
+    // 読み戻せないという形で静かに壊れる。既定値の全キーで確かめる。
+    const settings: AppSettings = {
+      theme: 'dark',
+      libraryView: 'list',
+      librarySort: 'title',
+      updateCheck: 'on'
+    }
+    expect(appSettingsFromRaw(appSettingsToRaw(settings))).toEqual(settings)
+  })
+
+  it('既定値と違う値が全キーで読み戻せる', () => {
+    // 既定値と一致してしまうと「読めていない」ことに気づけないので、
+    // 1項目ずつ既定値からずらして確かめる。
+    const alternatives: AppSettings = {
+      theme: 'sepia',
+      libraryView: 'list',
+      librarySort: 'author',
+      updateCheck: 'off'
+    }
+    for (const key of Object.keys(DEFAULT_APP_SETTINGS) as Array<keyof AppSettings>) {
+      const changed = { ...DEFAULT_APP_SETTINGS, [key]: alternatives[key] }
+      expect(alternatives[key]).not.toBe(DEFAULT_APP_SETTINGS[key])
+      expect(appSettingsFromRaw(appSettingsToRaw(changed))[key]).toBe(alternatives[key])
+    }
+  })
+
+  it('接頭辞の無い古い theme も読む', () => {
+    expect(appSettingsFromRaw({ theme: 'dark' }).theme).toBe('dark')
+  })
+
+  it('接頭辞つきが古い値より優先される', () => {
+    expect(appSettingsFromRaw({ theme: 'light', 'app.theme': 'dark' }).theme).toBe('dark')
+  })
+
+  it('空の保存値は既定値になる', () => {
+    expect(appSettingsFromRaw({})).toEqual(DEFAULT_APP_SETTINGS)
   })
 })

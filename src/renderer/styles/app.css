@@ -151,6 +151,13 @@ input, select {
   background: var(--surface);
   border-block-end: 1px solid var(--border);
 }
+/* 知らせに対する操作。本文が長くても、ボタンは縮めずに右端へ寄せる。 */
+.notice-actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+  align-items: center;
+}
 
 .empty-state {
   display: grid;

@@ -40,16 +40,27 @@ export interface ReaderSettings {
   estimatedCharsPerMinute: number
 }
 
+/**
+ * 更新確認の可否。
+ *
+ * 'ask' は「まだ訊いていない」。既定をこれにしてあるのは、更新確認が
+ * ユーザーの操作なしに外部へ出ていく唯一の通信で、相手から見れば
+ * 起動したことと IP が分かるため。黙って始めず、一度だけ訊く。
+ */
+export type UpdateCheckSetting = 'ask' | 'on' | 'off'
+
 export interface AppSettings {
   theme: ThemeName
   libraryView: LibraryViewMode
   librarySort: LibrarySortKey
+  updateCheck: UpdateCheckSetting
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   theme: 'system',
   libraryView: 'grid',
-  librarySort: 'recent'
+  librarySort: 'recent',
+  updateCheck: 'ask'
 }
 
 /**
@@ -145,8 +156,36 @@ export function normalizeAppSettings(raw: Partial<AppSettings> | null): AppSetti
     libraryView: s.libraryView === 'list' ? 'list' : 'grid',
     librarySort: (['recent', 'title', 'author', 'added', 'progress'] as const).includes(s.librarySort)
       ? s.librarySort
-      : 'recent'
+      : 'recent',
+    // 読めない値は 'ask' に倒す。黙って通信を始める 'on' には倒さない。
+    updateCheck: (['ask', 'on', 'off'] as const).includes(s.updateCheck) ? s.updateCheck : 'ask'
   }
+}
+
+/** key-value ストアでの接頭辞。読書設定(reader.)と分ける。 */
+const APP_PREFIX = 'app.'
+
+/**
+ * 保存された key-value から AppSettings を組み立てる。
+ *
+ * 読む項目を手で並べると、AppSettings に項目を足したときに足し忘れる。
+ * そうなると「保存はされるのに読み戻せない」という形で静かに壊れ、
+ * 設定を変えても次の瞬間に既定値へ戻る。既定値のキーを辿って防ぐ。
+ */
+export function appSettingsFromRaw(raw: Record<string, unknown>): AppSettings {
+  const picked: Record<string, unknown> = {}
+  for (const key of Object.keys(DEFAULT_APP_SETTINGS)) {
+    // 接頭辞を付ける前の版が書いた値が残っていることがある(theme)。
+    picked[key] = raw[APP_PREFIX + key] ?? raw[key]
+  }
+  return normalizeAppSettings(picked as Partial<AppSettings>)
+}
+
+/** AppSettings を key-value ストアへ入れる形にする。 */
+export function appSettingsToRaw(settings: AppSettings): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(settings).map(([key, value]) => [APP_PREFIX + key, value])
+  )
 }
 
 function num(v: unknown, fallback: number): number {

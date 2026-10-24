@@ -142,7 +142,26 @@ export interface AozoraIpcApi {
   renameFont(id: string, displayName: string): Promise<CustomFontDto[]>
   deleteFont(id: string): Promise<CustomFontDto[]>
   getFontData(id: string): Promise<Uint8Array>
+
+  /** 動いているアプリの版。 */
+  getAppVersion(): Promise<string>
+  /**
+   * 更新の有無。設定が 'on' のときだけ外へ出る。
+   * 前回の確認から間が空いていなければ、覚えている結果をそのまま返す。
+   */
+  checkForUpdate(): Promise<UpdateStatus>
 }
+
+/**
+ * 更新確認の結果。
+ * 'unavailable' は「確認できなかった」で、失敗ではない。圏外でも、
+ * まだ一度もリリースを公開していなくても、ここに落ちる。
+ */
+export type UpdateStatus =
+  | { state: 'disabled' }
+  | { state: 'unavailable' }
+  | { state: 'current'; version: string }
+  | { state: 'available'; version: string; url: string }
 
 export interface AozoraApi extends AozoraIpcApi {
   /** Electron が保持する File の実パスを preload 内で安全に解決する。 */
@@ -193,7 +212,9 @@ export const IPC_CHANNELS = [
   'listFonts',
   'renameFont',
   'deleteFont',
-  'getFontData'
+  'getFontData',
+  'getAppVersion',
+  'checkForUpdate'
 ] as const satisfies ReadonlyArray<keyof AozoraIpcApi>
 
 export type IpcChannel = (typeof IPC_CHANNELS)[number]

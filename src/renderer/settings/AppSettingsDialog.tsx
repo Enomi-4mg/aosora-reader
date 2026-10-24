@@ -64,6 +64,18 @@ export function AppSettingsDialog({ onClose }: { onClose: () => void }): JSX.Ele
               {THEMES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </label>
+          <label>更新の確認
+            <select
+              value={app.settings.updateCheck === 'on' ? 'on' : 'off'}
+              onChange={(event) => void app.patch({ updateCheck: event.target.value as 'on' | 'off' })}
+            >
+              <option value="on">新しい版が出たら知らせる</option>
+              <option value="off">確認しない</option>
+            </select>
+          </label>
+          <p className="muted small">
+            確認するときだけ GitHub へ接続します。ダウンロードも入れ替えも自動では行いません。
+          </p>
         </section>
 
         <section>

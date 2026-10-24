@@ -3,7 +3,7 @@
  */
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, net, protocol, shell, type MenuItemConstructorOptions } from 'electron'
 import { join } from 'node:path'
-import { DEFAULT_APP_SETTINGS, DEFAULT_SETTINGS, normalizeAppSettings, normalizeSettings, type AppSettings, type ReaderSettings } from '@shared/model/settings'
+import { appSettingsFromRaw, appSettingsToRaw, DEFAULT_APP_SETTINGS, DEFAULT_SETTINGS, normalizeAppSettings, normalizeSettings, type AppSettings, type ReaderSettings } from '@shared/model/settings'
 import type { AozoraIpcApi, ImportOutcome, OpenBookResult } from '@shared/ipc'
 import { openDatabase, SchemaTooNewError, type Db } from './db/connection'
 import { BookRepository } from './repositories/BookRepository'
@@ -19,6 +19,7 @@ import { WiktionaryProvider } from './services/DictionaryService'
 import { CustomFontService } from './services/CustomFontService'
 import { BookImageService } from './services/BookImageService'
 import { ReparseService } from './services/ReparseService'
+import { UpdateService, textFetcher } from './services/UpdateService'
 import { IMAGE_SCHEME } from '@shared/ipc'
 
 /**
@@ -131,6 +132,7 @@ let dictionary: WiktionaryProvider
 let customFonts: CustomFontService
 let bookImages: BookImageService
 let reparse: ReparseService
+let updates: UpdateService
 
 function initServices(): void {
   db = openDatabase(join(app.getPath('userData'), 'library.db'))
@@ -154,6 +156,7 @@ function initServices(): void {
     return response.json()
   })
   customFonts = new CustomFontService(join(app.getPath('userData'), 'fonts'))
+  updates = new UpdateService(app.getVersion(), settings, textFetcher(net.fetch))
 }
 
 function createWindow(): BrowserWindow {
@@ -386,24 +389,19 @@ const handlers: AozoraIpcApi = {
   },
 
   async getAppSettings(): Promise<AppSettings> {
-    const raw = settings.getAll()
-    return normalizeAppSettings({
-      theme: (raw['app.theme'] ?? raw.theme) as AppSettings['theme'],
-      libraryView: raw['app.libraryView'] as AppSettings['libraryView'],
-      librarySort: raw['app.librarySort'] as AppSettings['librarySort']
-    })
+    return appSettingsFromRaw(settings.getAll())
   },
 
   async saveAppSettings(patch): Promise<AppSettings> {
     const current = await handlers.getAppSettings()
     const merged = normalizeAppSettings({ ...current, ...patch })
-    settings.setMany(Object.fromEntries(Object.entries(merged).map(([key, value]) => [`app.${key}`, value])))
+    settings.setMany(appSettingsToRaw(merged))
     applyTitleBarOverlay(merged.theme)
     return merged
   },
 
   async resetAppSettings(): Promise<AppSettings> {
-    settings.setMany(Object.fromEntries(Object.entries(DEFAULT_APP_SETTINGS).map(([key, value]) => [`app.${key}`, value])))
+    settings.setMany(appSettingsToRaw(DEFAULT_APP_SETTINGS))
     applyTitleBarOverlay(DEFAULT_APP_SETTINGS.theme)
     return DEFAULT_APP_SETTINGS
   },
@@ -441,7 +439,14 @@ const handlers: AozoraIpcApi = {
   async listFonts() { return customFonts.list() },
   async renameFont(id, displayName) { return customFonts.rename(id, displayName) },
   async deleteFont(id) { return customFonts.delete(id) },
-  async getFontData(id) { return customFonts.data(id) }
+  async getFontData(id) { return customFonts.data(id) },
+
+  async getAppVersion() { return app.getVersion() },
+
+  async checkForUpdate() {
+    const { updateCheck } = await handlers.getAppSettings()
+    return updates.check(updateCheck === 'on')
+  }
 }
 
 function registerIpc(): void {

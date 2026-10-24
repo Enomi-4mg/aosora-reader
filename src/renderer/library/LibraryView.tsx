@@ -7,6 +7,7 @@ import type { AozoraCatalogWork } from '@shared/ipc'
 import { BookActionsMenu } from './BookActionsMenu'
 import { useAppSettingsStore } from '../state/useAppSettingsStore'
 import { AppSettingsDialog } from '../settings/AppSettingsDialog'
+import { useUpdateNotice } from '../hooks/useUpdateNotice'
 
 const SORT_LABELS: Array<[SortKey, string]> = [
   ['recent', '最近読んだ順'],
@@ -23,6 +24,7 @@ interface Props {
 export function LibraryView({ onOpen }: Props): JSX.Element {
   const s = useLibraryStore()
   const app = useAppSettingsStore()
+  const update = useUpdateNotice()
   const books = selectVisibleBooks(s)
   const [pendingDelete, setPendingDelete] = useState<BookSummary | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
@@ -103,6 +105,31 @@ export function LibraryView({ onOpen }: Props): JSX.Element {
         <div className="notice" role="status">
           <span>{s.notice}</span>
           <button className="ghost" onClick={s.dismissNotice} aria-label="通知を閉じる">×</button>
+        </div>
+      )}
+
+      {update.notice?.kind === 'consent' && (
+        <div className="notice" role="status">
+          <span>
+            新しい版が出たときにお知らせしますか？
+            <span className="muted small">
+              {' '}確認のたびに GitHub へ接続します。あとから設定で変えられます。
+            </span>
+          </span>
+          <span className="notice-actions">
+            <button onClick={update.allow}>知らせる</button>
+            <button className="ghost" onClick={update.decline}>しない</button>
+          </span>
+        </div>
+      )}
+
+      {update.notice?.kind === 'available' && (
+        <div className="notice" role="status">
+          <span>青空Reader {update.notice.version} が公開されています。</span>
+          <span className="notice-actions">
+            <a href={update.notice.url} target="_blank" rel="noreferrer">ダウンロード</a>
+            <button className="ghost" onClick={update.dismiss} aria-label="通知を閉じる">×</button>
+          </span>
         </div>
       )}
 
