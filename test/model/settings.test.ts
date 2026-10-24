@@ -3,6 +3,7 @@ import {
   DEFAULT_SETTINGS,
   DEFAULT_APP_SETTINGS,
   FONT_SIZE_MAX,
+  FONT_STACKS,
   LINE_HEIGHT_MIN,
   normalizeAppSettings,
   normalizeSettings
@@ -42,5 +43,39 @@ describe('normalizeSettings', () => {
     expect(normalizeAppSettings({ libraryView: 'list', librarySort: 'title' })).toMatchObject({
       libraryView: 'list', librarySort: 'title'
     })
+  })
+})
+
+describe('書体の読み替え', () => {
+  it('古い版が保存した明朝体は、どの世代でも今の明朝体になる', () => {
+    // 実際に保存されていた2世代ぶん。Yu Mincho を足した版と、その前。
+    for (const old of [
+      '"Hiragino Mincho ProN", "YuMincho", "Noto Serif JP", serif',
+      '"Hiragino Mincho ProN", "YuMincho", "Yu Mincho", "Noto Serif JP", serif'
+    ]) {
+      expect(normalizeSettings({ fontFamily: old }).fontFamily).toBe(FONT_STACKS.mincho)
+    }
+  })
+
+  it('ゴシック体と丸ゴシックも読み替える', () => {
+    expect(
+      normalizeSettings({ fontFamily: '"Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif' })
+        .fontFamily
+    ).toBe(FONT_STACKS.gothic)
+    expect(
+      normalizeSettings({ fontFamily: '"Hiragino Maru Gothic ProN", "Yu Gothic", sans-serif' })
+        .fontFamily
+    ).toBe(FONT_STACKS.maruGothic)
+  })
+
+  it('組み込み書体は Windows にも同系統の書体が残る', () => {
+    expect(FONT_STACKS.mincho).toContain('Yu Mincho')
+    expect(FONT_STACKS.mincho).toContain('MS PMincho')
+    expect(FONT_STACKS.gothic).toContain('Yu Gothic')
+  })
+
+  it('追加フォントなど知らない値はそのまま通す', () => {
+    const custom = '"Aozora Custom 11111111-2222-3333-4444-555555555555"'
+    expect(normalizeSettings({ fontFamily: custom }).fontFamily).toBe(custom)
   })
 })

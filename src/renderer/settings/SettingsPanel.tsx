@@ -3,9 +3,9 @@ import { useEffect, useRef, useState, type JSX } from 'react'
 import { useSettingsStore } from '../state/useSettingsStore'
 import { customFontFamily, useAppSettingsStore } from '../state/useAppSettingsStore'
 import {
-  DEFAULT_SETTINGS,
   FONT_SIZE_MAX,
   FONT_SIZE_MIN,
+  FONT_STACKS,
   LINE_HEIGHT_MAX,
   LINE_HEIGHT_MIN,
   type ReaderSettings
@@ -13,10 +13,11 @@ import {
 
 // 先頭は必ず既定値と同一文字列にする。ずれると初回起動時に
 // <select> がどの <option> とも一致せず、現在の書体を表示できない。
+// 文字列を変えるときは settings.ts の LEGACY_FONT_STACKS に旧値を足すこと。
 const FONTS: Array<[string, string]> = [
-  [DEFAULT_SETTINGS.fontFamily, '明朝体'],
-  ['"Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif', 'ゴシック体'],
-  ['"Hiragino Maru Gothic ProN", "Yu Gothic", sans-serif', '丸ゴシック']
+  [FONT_STACKS.mincho, '明朝体'],
+  [FONT_STACKS.gothic, 'ゴシック体'],
+  [FONT_STACKS.maruGothic, '丸ゴシック']
 ]
 
 export const THEMES = [
