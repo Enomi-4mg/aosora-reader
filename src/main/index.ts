@@ -1,7 +1,7 @@
 /**
  * Electron main プロセス。fs / SQLite / パーサーはすべてこちら側に閉じる。
  */
-import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, net, protocol, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, net, protocol, shell, type MenuItemConstructorOptions } from 'electron'
 import { join } from 'node:path'
 import { DEFAULT_APP_SETTINGS, DEFAULT_SETTINGS, normalizeAppSettings, normalizeSettings, type AppSettings, type ReaderSettings } from '@shared/model/settings'
 import type { AozoraIpcApi, ImportOutcome, OpenBookResult } from '@shared/ipc'
@@ -37,6 +37,86 @@ import { IMAGE_SCHEME } from '@shared/ipc'
  */
 const USER_DATA_DIR = 'aosora-reader'
 app.setPath('userData', join(app.getPath('appData'), USER_DATA_DIR))
+
+const IS_MAC = process.platform === 'darwin'
+
+/** renderer の --titlebar-height と対。操作系はこの1段に収まる。 */
+const TITLEBAR_HEIGHT = 52
+
+/**
+ * Windows / Linux の最小化・最大化・閉じるは、アプリ側が色を決める。
+ * ツールバーと地色が違うとそこだけ別の帯に見えるので、theme.css の
+ * --bg / --fg と同じ値を渡す。mac の信号機には色の指定が無いので関係しない。
+ */
+const OVERLAY_COLORS: Record<'light' | 'sepia' | 'dark', { color: string; symbolColor: string }> = {
+  light: { color: '#fbfbfa', symbolColor: '#1c1b19' },
+  sepia: { color: '#f4ecd8', symbolColor: '#43382a' },
+  dark: { color: '#16181c', symbolColor: '#d9d5cd' }
+}
+
+function overlayColors(theme: AppSettings['theme']): { color: string; symbolColor: string } {
+  if (theme === 'system') return nativeTheme.shouldUseDarkColors ? OVERLAY_COLORS.dark : OVERLAY_COLORS.light
+  return OVERLAY_COLORS[theme]
+}
+
+/** テーマが変わったらウィンドウ操作ボタンの地色も追従させる。 */
+function applyTitleBarOverlay(theme: AppSettings['theme']): void {
+  if (IS_MAC) return
+  const overlay = { ...overlayColors(theme), height: TITLEBAR_HEIGHT }
+  for (const win of BrowserWindow.getAllWindows()) win.setTitleBarOverlay(overlay)
+}
+
+/**
+ * アプリメニュー。
+ *
+ * mac は既定メニューが無いと ⌘C も ⌘Q も効かなくなるので必ず要る。
+ * Windows / Linux ではメニューバーを隠す(autoHideMenuBar)が、メニュー自体は残す。
+ * Ctrl+C / Ctrl+V の割り当てはここから来ていて、setApplicationMenu(null) にすると
+ * 検索欄でコピーも貼り付けもできなくなる。隠してあるので Alt で出せる。
+ *
+ * 表示に再読み込みと拡大縮小は入れない。ページ送りは multicolumn と transform の
+ * 幾何に乗っているので、ブラウザ側の拡大が混ざると文字サイズの操作が二重になる。
+ */
+function buildAppMenu(): Menu {
+  const template: MenuItemConstructorOptions[] = [
+    ...(IS_MAC ? [{ role: 'appMenu' as const }] : []),
+    {
+      label: '編集',
+      submenu: [
+        { role: 'undo', label: '取り消す' },
+        { role: 'redo', label: 'やり直す' },
+        { type: 'separator' },
+        { role: 'cut', label: '切り取り' },
+        { role: 'copy', label: 'コピー' },
+        { role: 'paste', label: '貼り付け' },
+        { role: 'selectAll', label: 'すべて選択' }
+      ]
+    },
+    {
+      label: '表示',
+      submenu: [
+        { role: 'togglefullscreen', label: '全画面表示' },
+        { type: 'separator' },
+        { role: 'toggleDevTools', label: '開発者ツール' }
+      ]
+    },
+    {
+      label: 'ウィンドウ',
+      submenu: IS_MAC
+        ? [
+            { role: 'minimize', label: '最小化' },
+            { role: 'zoom', label: '拡大/縮小' },
+            { type: 'separator' },
+            { role: 'front', label: 'すべてを手前に移動' }
+          ]
+        : [
+            { role: 'minimize', label: '最小化' },
+            { role: 'close', label: '閉じる' }
+          ]
+    }
+  ]
+  return Menu.buildFromTemplate(template)
+}
 
 let db: Db
 let books: BookRepository
@@ -77,16 +157,31 @@ function initServices(): void {
 }
 
 function createWindow(): BrowserWindow {
+  const dark = nativeTheme.shouldUseDarkColors
   const win = new BrowserWindow({
     width: 1180,
     height: 820,
     minWidth: 640,
     minHeight: 480,
-    titleBarStyle: 'hiddenInset',
     // 操作系は 52px のツールバー1段に収める(renderer の --titlebar-height)。
-    // 信号機ボタンをその中央に置き、タイトルバーと別の段にしない。
-    trafficLightPosition: { x: 19, y: 18 },
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#16181c' : '#fbfbfa',
+    // mac は信号機ボタンをその中央に置き、タイトルバーと別の段にしない。
+    // Windows / Linux に hiddenInset は無く、指定しても枠が消えるだけで
+    // 最小化・最大化・閉じるがどこにも出ない。titleBarOverlay で同じ帯に重ねる。
+    // 空ける側が左右で逆になるので、余白は renderer の --titlebar-inset-end で持つ。
+    ...(IS_MAC
+      ? {
+          titleBarStyle: 'hiddenInset' as const,
+          trafficLightPosition: { x: 19, y: 18 }
+        }
+      : {
+          titleBarStyle: 'hidden' as const,
+          titleBarOverlay: {
+            ...(dark ? OVERLAY_COLORS.dark : OVERLAY_COLORS.light),
+            height: TITLEBAR_HEIGHT
+          },
+          autoHideMenuBar: true
+        }),
+    backgroundColor: dark ? '#16181c' : '#fbfbfa',
     show: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -303,11 +398,13 @@ const handlers: AozoraIpcApi = {
     const current = await handlers.getAppSettings()
     const merged = normalizeAppSettings({ ...current, ...patch })
     settings.setMany(Object.fromEntries(Object.entries(merged).map(([key, value]) => [`app.${key}`, value])))
+    applyTitleBarOverlay(merged.theme)
     return merged
   },
 
   async resetAppSettings(): Promise<AppSettings> {
     settings.setMany(Object.fromEntries(Object.entries(DEFAULT_APP_SETTINGS).map(([key, value]) => [`app.${key}`, value])))
+    applyTitleBarOverlay(DEFAULT_APP_SETTINGS.theme)
     return DEFAULT_APP_SETTINGS
   },
 
@@ -423,7 +520,19 @@ app.whenReady().then(() => {
   }
   registerImageProtocol()
   registerIpc()
+  Menu.setApplicationMenu(buildAppMenu())
   createWindow()
+
+  // 保存されたテーマはここで初めて読める。ウィンドウはもう出ているので、
+  // 既定色で作ってから本来の色へ直す。
+  void handlers.getAppSettings().then((s) => applyTitleBarOverlay(s.theme))
+
+  // theme が system のときだけ、OS の明暗にウィンドウ操作ボタンも追従させる。
+  nativeTheme.on('updated', () => {
+    void handlers.getAppSettings().then((s) => {
+      if (s.theme === 'system') applyTitleBarOverlay(s.theme)
+    })
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

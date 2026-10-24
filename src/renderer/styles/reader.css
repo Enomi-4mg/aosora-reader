@@ -33,6 +33,7 @@
   min-block-size: var(--titlebar-height);
   padding: 6px 12px;
   padding-inline-start: var(--titlebar-inset);
+  padding-inline-end: var(--titlebar-inset-end);
   border-block-end: 1px solid var(--border);
   -webkit-app-region: drag;
 }
@@ -720,8 +721,13 @@ rt {
 .settings-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 
 @media (max-width: 760px) {
-  /* 信号機ボタンは窓幅で縮まないので、左の余白だけは狭くしない。 */
-  .toolbar { gap: 4px; padding-inline: 8px; padding-inline-start: var(--titlebar-inset); }
+  /* ウィンドウ操作ボタンは窓幅で縮まないので、その側の余白だけは狭くしない。 */
+  .toolbar {
+    gap: 4px;
+    padding-inline: 8px;
+    padding-inline-start: var(--titlebar-inset);
+    padding-inline-end: var(--titlebar-inset-end);
+  }
   .toolbar-title .muted { display: none; }
   .toolbar-search { min-inline-size: 0; }
   .search-head { gap: 3px; }

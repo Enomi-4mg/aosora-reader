@@ -9,9 +9,11 @@
   /*
    * macOS のツールバー。titleBarStyle: 'hiddenInset' でタイトルバーは消え、
    * 信号機ボタンだけがこの帯に重なる。main の trafficLightPosition と対で調整する。
+   * ボタンは左端なので、空けるのは inset(前側)だけ。
    */
   --titlebar-height: 52px;
   --titlebar-inset: 84px;
+  --titlebar-inset-end: 12px;
 
   --bg: #fbfbfa;
   --fg: #1c1b19;
@@ -94,9 +96,21 @@
   }
 }
 
-/* 全画面では信号機ボタンが消えるので、ツールバー左の余白は要らない。 */
+/*
+ * Windows / Linux は最小化・最大化・閉じるが右端に出る(main の titleBarOverlay)。
+ * 信号機ぶんの左余白は要らなくなり、代わりに右を空ける。
+ * 146px = 46px のボタン3つ + 余白。Windows 11 の既定の大きさに合わせてある。
+ */
+:root[data-platform='win32'],
+:root[data-platform='linux'] {
+  --titlebar-inset: 12px;
+  --titlebar-inset-end: 146px;
+}
+
+/* 全画面ではどの OS でもウィンドウ操作ボタンが消えるので、余白は要らない。 */
 :root[data-fullscreen='true'] {
   --titlebar-inset: 12px;
+  --titlebar-inset-end: 12px;
 }
 
 ::selection {

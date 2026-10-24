@@ -129,8 +129,9 @@ input, select {
   align-items: center;
   min-block-size: var(--titlebar-height);
   padding: 6px 14px;
-  /* 信号機ボタンと同じ段に並べる。左端はその幅ぶんだけ空ける。 */
+  /* ウィンドウ操作ボタンと同じ段に並べる。その側はボタンの幅ぶんだけ空ける。 */
   padding-inline-start: var(--titlebar-inset);
+  padding-inline-end: max(14px, var(--titlebar-inset-end));
   border-block-end: 1px solid var(--border);
   -webkit-app-region: drag;
 }
@@ -319,8 +320,13 @@ input, select {
 .reset-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 
 @media (max-width: 900px) {
-  /* 信号機ボタンは窓幅で縮まないので、左の余白だけは狭くしない。 */
-  .library-bar { gap: 8px; padding-inline: 12px; padding-inline-start: var(--titlebar-inset); }
+  /* ウィンドウ操作ボタンは窓幅で縮まないので、その側の余白だけは狭くしない。 */
+  .library-bar {
+    gap: 8px;
+    padding-inline: 12px;
+    padding-inline-start: var(--titlebar-inset);
+    padding-inline-end: max(12px, var(--titlebar-inset-end));
+  }
   .search-input { min-inline-size: 180px; max-inline-size: none; }
   .shelf { padding: 14px; }
 }
