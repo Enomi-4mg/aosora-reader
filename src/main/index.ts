@@ -21,6 +21,23 @@ import { BookImageService } from './services/BookImageService'
 import { ReparseService } from './services/ReparseService'
 import { IMAGE_SCHEME } from '@shared/ipc'
 
+/**
+ * ユーザーデータの置き場。本棚(library.db)・挿絵・追加フォントが全部ここに入る。
+ *
+ * 既定値は `app.getName()` 由来で、それは package.json の `productName` があれば
+ * そちらを、無ければ `name` を返す。つまり package.json に `productName: 青空Reader`
+ * を足した瞬間に、保存先が `aosora-reader` から `青空Reader` へ黙って移る。
+ * ユーザーから見れば本棚が消えたのと同じなので、名前のほうを固定しておく。
+ *
+ * 値は現行の実測値に合わせてある(mac のパッケージ版も dev も `aosora-reader`)。
+ * electron-builder.yml の productName はバンドルの表示名にしか効かない。
+ * Windows でも `%APPDATA%\aosora-reader` となり、ASCII で収まる。
+ *
+ * ここを変えると既存ユーザーの本棚が見えなくなる。変えるなら移行処理とセットで。
+ */
+const USER_DATA_DIR = 'aosora-reader'
+app.setPath('userData', join(app.getPath('appData'), USER_DATA_DIR))
+
 let db: Db
 let books: BookRepository
 let progress: ProgressRepository
