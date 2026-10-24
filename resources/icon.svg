@@ -1,0 +1,21 @@
+<!--
+  アプリアイコンの原本。icon.png はこれを書き出したもので、
+  electron-builder は buildResources の icon.png から icns / ico を作る。
+
+    rsvg-convert -w 1024 -h 1024 resources/icon.svg -o resources/icon.png
+
+  「青」はテキストのままなので、書き出しには Hiragino Sans が要る。
+  明朝だと横画が細く、32px(Windows のタスクバー)で消えてしまうためゴシック。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#0c1e38"/>
+      <stop offset="0.5" stop-color="#1b4f87"/>
+      <stop offset="1" stop-color="#4a93d4"/>
+    </linearGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="208" fill="url(#sky)"/>
+  <text x="512" y="512" fill="#ffffff" font-family="Hiragino Sans, sans-serif"
+        font-size="600" font-weight="600" text-anchor="middle" dominant-baseline="central">青</text>
+</svg>
