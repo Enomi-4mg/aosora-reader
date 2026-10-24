@@ -1,7 +1,7 @@
 # 青空Reader
 
 青空文庫の作品をデスクトップで読むための電子書籍リーダー。
-Electron + React + TypeScript / macOS 向け。
+Electron + React + TypeScript / macOS・Windows 向け。
 
 コードを読み始める方は、[コード読解指南書](docs/CODE_GUIDE.md)を参照してください。
 読む順番、データ構造、主要処理の流れ、変更箇所の探し方を具体例と図で説明しています。
@@ -30,6 +30,15 @@ npm run dev
 | `npm test` | ユニットテスト |
 | `npm run typecheck` | 型検査 |
 | `npm run dist` | macOS 向け dmg を作る |
+| `npm run dist:win` | Windows 向け NSIS インストーラを作る |
+
+配布物は `v0.2.0` のようなタグを push すると GitHub Actions が両 OS 分を作り、
+下書きの Release にまとめる(`.github/workflows/release.yml`)。
+タグと `package.json` の `version` は揃えること。食い違うとビルド前に止まる。
+
+`npm run dist:win` を Apple Silicon の Mac で走らせると、アプリの梱包までは
+進むがインストーラの生成で止まる。electron-builder が持つ `makensis` が
+x86_64 バイナリで、Rosetta を要求するため。Windows か CI で作るほうが早い。
 
 ## 設計の核 — 2つの不変条件
 

@@ -1,0 +1,129 @@
+# タグを push すると mac と Windows の配布物を作り、下書きの Release にまとめる。
+#
+#   git tag v0.2.0 && git push origin v0.2.0
+#
+# Release は下書きで止める。公開はリリースノートを書いてから手で押す。
+# 署名はまだ入れていないので、mac は Gatekeeper、Windows は SmartScreen の
+# 警告が出る状態の配布物になる。
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  # タグを切らずに通しを確認したいとき用。この場合 Release は作らない。
+  workflow_dispatch:
+
+# 同じタグの実行が重ならないようにする。
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  # node:sqlite はフラグ無しでは Node 23.4 以降にしか無い。
+  # ここを下げると test/db がそのまま落ちる。
+  NODE_VERSION: '24'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      # 依存を入れる前に見る。食い違っていたら数秒で落ちてほしい。
+      - name: タグと package.json の版が一致するか
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "タグ $GITHUB_REF_NAME に対し package.json は $pkg です。" >&2
+            echo "electron-builder は package.json の版で成果物を作るので、揃えてください。" >&2
+            exit 1
+          fi
+          echo "version $pkg"
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+  build:
+    needs: check
+    strategy:
+      # 片方が落ちても、もう片方の成果物は見たい。
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+            name: mac
+          - os: windows-latest
+            platform: win
+            name: windows
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      # ファイルロックの振る舞いは OS で変わる(library.db は WAL)。
+      # 両方で通してから固める。
+      - run: npm test
+
+      - run: npm run build
+
+      - name: パッケージ
+        # 署名の鍵は置いていない。mac では無効な identity を拾いにいかせない。
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx electron-builder --${{ matrix.platform }} --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          # 配布するものだけ。win-unpacked・nsis.7z・builder-debug.yml は
+          # 中間生成物なので拾わない。latest*.yml は更新確認で読む版情報。
+          path: |
+            dist/*.dmg
+            dist/*.exe
+            dist/*.blockmap
+            dist/latest*.yml
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - run: ls -la artifacts
+
+      - name: 下書きの Release を作る
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --draft \
+            --generate-notes \
+            artifacts/*
