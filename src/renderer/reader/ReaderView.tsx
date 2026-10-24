@@ -419,7 +419,15 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
     onEscape: closeTransient
   })
 
-  if (store.loading) return <div className="reader-loading">読み込み中…</div>
+  if (store.loading) {
+    // パーサーを更新した版で初めて開く本は、ここで本文を作り直すぶん待たされる。
+    // 同じ「読み込み中…」だと固まったように見えるので、理由を出す。
+    return (
+      <div className="reader-loading">
+        {store.reparsing ? '本文を新しい解析で作り直しています…' : '読み込み中…'}
+      </div>
+    )
+  }
   if (store.error) {
     return (
       <div className="reader-loading">
@@ -652,6 +660,25 @@ export function ReaderView({ onBackToLibrary, onOpenBook }: Props): JSX.Element 
       {store.needsReimport && (
         <p className="stale-parse">
           この作品は古い解析結果のまま表示されています。取り込み直すと、挿絵や注記の表示が新しくなります。
+        </p>
+      )}
+      {/*
+        * 付け替えの結果。本文を作り直すと栞やハイライトの位置も動くので、
+        * 動かしたことを黙っていると「栞が別の場所を指している」としか見えない。
+        * 付け替えられなかったぶんは注釈一覧に orphan として残る。
+        */}
+      {store.reparsed && (
+        <p className="reparse-report" role="status">
+          <span>
+            本文を新しい解析で作り直しました。
+            {store.reparsed.movedPositions > 0 &&
+              `栞やハイライトなど${store.reparsed.movedPositions}件の位置を調整しています。`}
+            {store.reparsed.droppedPositions > 0 &&
+              `${store.reparsed.droppedPositions}件は対応する場所が見つからず、注釈一覧に残しています。`}
+          </span>
+          <button className="ghost" onClick={store.dismissReparseReport} aria-label="通知を閉じる">
+            ×
+          </button>
         </p>
       )}
       <div className="reader-body">

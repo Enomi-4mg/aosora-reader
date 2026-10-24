@@ -64,6 +64,18 @@ export class BookRepository {
   }
 
   /**
+   * 作り直しが要るかだけを見る。
+   * parseState と違い原文を読み出さないので、開く前の判定に使える。
+   * (原文は中央値で数 KB、最大 2MB ほどあり、要否の判定のために読む量ではない)
+   */
+  parseStatus(bookId: string): { version: number; hasSource: boolean } | null {
+    const r = this.db
+      .prepare('SELECT parser_version, source_text IS NOT NULL AS has_source FROM books WHERE id = ?')
+      .get(bookId) as { parser_version: number; has_source: number } | undefined
+    return r ? { version: r.parser_version, hasSource: r.has_source === 1 } : null
+  }
+
+  /**
    * 本文だけを作り直す。books 行と注釈はそのまま残す。
    * 位置の付け替えは呼び出し側(ReparseService)の責任。
    */

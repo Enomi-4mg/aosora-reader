@@ -76,6 +76,21 @@
   border-block-end: 1px solid var(--border);
 }
 
+/* 付け替えの結果。断り書きと同じ見た目で、閉じるボタンだけ右端に置く。 */
+.reparse-report {
+  display: flex;
+  gap: 12px;
+  align-items: start;
+  justify-content: space-between;
+  margin: 0;
+  padding: 0.5em 1em;
+  font-size: 0.85em;
+  color: var(--secondary);
+  background: var(--surface, transparent);
+  border-block-end: 1px solid var(--border);
+}
+.reparse-report button { flex: none; padding: 0 6px; }
+
 .reader-body { display: flex; flex: 1; min-block-size: 0; }
 
 .sidebar {

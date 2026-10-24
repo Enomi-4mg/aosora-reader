@@ -294,8 +294,19 @@ const handlers: AozoraIpcApi = {
     return {
       book,
       progress: progress.get(bookId),
-      needsReimport: outcome.status === 'unavailable'
+      needsReimport: outcome.status === 'unavailable',
+      reparsed:
+        outcome.status === 'updated'
+          ? {
+              movedPositions: outcome.movedPositions,
+              droppedPositions: outcome.droppedPositions
+            }
+          : null
     }
+  },
+
+  async willReparse(bookId) {
+    return reparse.pending(bookId)
   },
 
   async saveProgress(p) {

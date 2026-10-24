@@ -14,7 +14,7 @@ import {
   type BookIndex,
   type TextPosition
 } from '@shared/model/position'
-import type { SearchResultDto } from '@shared/ipc'
+import type { ReparseReport, SearchResultDto } from '@shared/ipc'
 
 export type SidebarTab = 'contents' | 'annotations' | 'bookmarks' | 'highlights' | 'notes'
 
@@ -32,6 +32,13 @@ interface ReaderState {
    * 原文を保存していなかったので、取り込み直すまで古い解析結果のまま。
    */
   needsReimport: boolean
+  /**
+   * 本文を作り直していれば、動かした位置の件数。
+   * 読み終えたら dismissReparseReport() で消す。
+   */
+  reparsed: ReparseReport | null
+  /** 作り直しの最中か。待たせる理由を loading の文言に出すために持つ。 */
+  reparsing: boolean
 
   sidebarOpen: boolean
   sidebarTab: SidebarTab
@@ -47,6 +54,7 @@ interface ReaderState {
 
   open: (bookId: string) => Promise<void>
   close: () => void
+  dismissReparseReport: () => void
   setChapter: (i: number) => void
   setPosition: (p: TextPosition) => void
   toggleSidebar: () => void
@@ -84,16 +92,31 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
   searchCursor: 0,
   searchError: null,
   needsReimport: false,
+  reparsed: null,
+  reparsing: false,
 
   async open(bookId) {
     const request = ++latestOpenRequest
     latestSearchRequest++
-    set({ loading: true, error: null, searchQuery: '', searchResult: null, searchCursor: 0, searchError: null })
+    set({ loading: true, error: null, searchQuery: '', searchResult: null, searchCursor: 0, searchError: null, reparsed: null, reparsing: false })
+
+    // 作り直しが走る本は開くまで待たされる。先に訊いて、待たせる理由を出す。
+    // async 関数の中で受けるのは、同期で投げられたときも拾うため。
+    // ここが失敗しても、待たせる理由を出せないだけで開く処理には関係ない。
+    void (async () => {
+      try {
+        const pending = await window.aozora.willReparse(bookId)
+        if (request === latestOpenRequest && pending) set({ reparsing: true })
+      } catch {
+        // 黙って進む
+      }
+    })()
+
     try {
       const r = await window.aozora.openBook(bookId)
       if (request !== latestOpenRequest) return
       if (!r) {
-        set({ loading: false, error: '作品を開けませんでした。' })
+        set({ loading: false, error: '作品を開けませんでした。', reparsing: false })
         return
       }
       const index = buildBookIndex(r.book)
@@ -110,15 +133,26 @@ export const useReaderStore = create<ReaderState>((set, get) => ({
         chapterIndex,
         percentage: position ? positionToPercentage(index, position) : 0,
         loading: false,
-        needsReimport: r.needsReimport
+        reparsing: false,
+        needsReimport: r.needsReimport,
+        // 位置が動いていないなら知らせることが無い。
+        reparsed:
+          r.reparsed && r.reparsed.movedPositions + r.reparsed.droppedPositions > 0
+            ? r.reparsed
+            : null
       })
     } catch (e) {
       if (request !== latestOpenRequest) return
       set({
         loading: false,
+        reparsing: false,
         error: e instanceof Error ? e.message : '作品を開けませんでした。'
       })
     }
+  },
+
+  dismissReparseReport() {
+    set({ reparsed: null })
   },
 
   close() {

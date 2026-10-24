@@ -193,3 +193,77 @@ describe('パーサー更新後の作り直し', () => {
     expect(reparse.run('book1')).toEqual({ status: 'current' })
   })
 })
+
+describe('作り直しが要るかの事前判定', () => {
+  it('最新の版なら走らない', () => {
+    books.insert(fresh(), SOURCE)
+    expect(reparse.pending('book1')).toBe(false)
+    expect(reparse.needsReimport('book1')).toBe(false)
+  })
+
+  it('古い版で原文があるなら走る', () => {
+    books.insert(fresh(), SOURCE)
+    markStale('book1', SOURCE)
+    expect(reparse.pending('book1')).toBe(true)
+    expect(reparse.needsReimport('book1')).toBe(false)
+  })
+
+  it('古い版でも原文が無ければ走らず、取り込み直しが要る', () => {
+    books.insert(fresh(), SOURCE)
+    markStale('book1', null)
+    expect(reparse.pending('book1')).toBe(false)
+    expect(reparse.needsReimport('book1')).toBe(true)
+  })
+
+  it('知らない本は何も言わない', () => {
+    expect(reparse.pending('missing')).toBe(false)
+    expect(reparse.needsReimport('missing')).toBe(false)
+  })
+
+  it('一度作り直せば次からは走らない', () => {
+    const { book } = stale()
+    books.insert(book, SOURCE)
+    markStale('book1', SOURCE)
+
+    expect(reparse.pending('book1')).toBe(true)
+    reparse.run('book1')
+    expect(reparse.pending('book1')).toBe(false)
+  })
+
+  it('判定は原文を読み出さない', () => {
+    // 原文は最大 2MB ほどある。要否を見るだけで読み込まないこと。
+    books.insert(fresh(), SOURCE)
+    markStale('book1', SOURCE)
+    const status = books.parseStatus('book1')!
+    expect(status).toEqual({ version: 0, hasSource: true })
+    expect(Object.keys(status)).not.toContain('sourceText')
+  })
+})
+
+describe('付け替えの件数', () => {
+  it('動かした件数と付け替えられなかった件数を返す', () => {
+    const { book, blockId, chapterId } = stale()
+    books.insert(book, SOURCE)
+    markStale('book1', SOURCE)
+
+    const at = book.chapters[0]!.blocks.find((b) => b.id === blockId)!.plainText.indexOf('後ろの文')
+    annotations.addBookmark('book1', { bookId: 'book1', chapterId, blockId, offset: at }, '栞')
+
+    const outcome = reparse.run('book1')
+    expect(outcome.status).toBe('updated')
+    if (outcome.status === 'updated') {
+      // ゴミが消えたぶん栞は前へ寄るので、動いた件数に数えられる。
+      expect(outcome.movedPositions).toBeGreaterThan(0)
+      expect(outcome.droppedPositions).toBe(0)
+    }
+  })
+
+  it('位置を持たない本なら件数は 0 のまま', () => {
+    const { book } = stale()
+    books.insert(book, SOURCE)
+    markStale('book1', SOURCE)
+
+    const outcome = reparse.run('book1')
+    expect(outcome).toEqual({ status: 'updated', movedPositions: 0, droppedPositions: 0 })
+  })
+})

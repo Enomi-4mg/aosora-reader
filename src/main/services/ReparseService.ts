@@ -42,8 +42,19 @@ export class ReparseService {
 
   /** この本が古い版で取り込まれていて、かつ作り直せないか。 */
   needsReimport(bookId: string): boolean {
-    const state = this.books.parseState(bookId)
-    return state !== null && state.version < PARSER_VERSION && state.sourceText === null
+    const state = this.books.parseStatus(bookId)
+    return state !== null && state.version < PARSER_VERSION && !state.hasSource
+  }
+
+  /**
+   * 開いたときに作り直しが走るか。
+   *
+   * 作り直しは本文の再解析と位置の付け替えを伴うので、本によっては待たされる。
+   * 開く前にこれを見て、待たせる理由を先に出す。原文を読まないので安い。
+   */
+  pending(bookId: string): boolean {
+    const state = this.books.parseStatus(bookId)
+    return state !== null && state.version < PARSER_VERSION && state.hasSource
   }
 
   /**

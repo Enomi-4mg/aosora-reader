@@ -64,6 +64,19 @@ export interface SearchResultDto {
   matches: SearchMatchDto[]
 }
 
+/**
+ * 本文を作り直したときに、位置情報をどれだけ動かしたか。
+ *
+ * 黙って動かすと「栞が別の場所を指している」としか見えないので、
+ * 読み手に見せるために外へ出す。
+ */
+export interface ReparseReport {
+  /** 新しい本文に合わせて位置をずらした件数(栞・ハイライト・メモ・読書位置)。 */
+  movedPositions: number
+  /** 対応する場所が見つからず、付け替えられなかった件数。 */
+  droppedPositions: number
+}
+
 export interface OpenBookResult {
   book: Book
   progress: ReadingProgressDto | null
@@ -73,6 +86,8 @@ export interface OpenBookResult {
    * 取り込み直すまで古い解析結果のまま表示される。
    */
   needsReimport: boolean
+  /** 今回の open で本文を作り直したときだけ入る。 */
+  reparsed: ReparseReport | null
 }
 
 export interface AozoraCatalogWork {
@@ -142,6 +157,12 @@ export interface AozoraIpcApi {
   renameFont(id: string, displayName: string): Promise<CustomFontDto[]>
   deleteFont(id: string): Promise<CustomFontDto[]>
   getFontData(id: string): Promise<Uint8Array>
+
+  /**
+   * 開いたときに本文の作り直しが走るか。
+   * 待たせる理由を先に出すためだけのもので、開く処理には影響しない。
+   */
+  willReparse(bookId: string): Promise<boolean>
 
   /** 動いているアプリの版。 */
   getAppVersion(): Promise<string>
@@ -213,6 +234,7 @@ export const IPC_CHANNELS = [
   'renameFont',
   'deleteFont',
   'getFontData',
+  'willReparse',
   'getAppVersion',
   'checkForUpdate'
 ] as const satisfies ReadonlyArray<keyof AozoraIpcApi>
