@@ -11,7 +11,16 @@ files:
   - package.json
 mac:
   target:
-    - dmg
+    # Apple Silicon と Intel の両方に配る。macos-latest は arm64 だが、
+    # ネイティブモジュールが無いので x64 はそのまま組み立てられる。
+    #
+    # 2つのアーキテクチャは必ず1回のビルドで作ること。ジョブを分けると
+    # latest-mac.yml がそれぞれ出来て、Release にまとめるときに
+    # 片方がもう片方を上書きし、更新情報から一方の dmg が消える。
+    - target: dmg
+      arch:
+        - arm64
+        - x64
   category: public.app-category.book
   darkModeSupport: true
 win:

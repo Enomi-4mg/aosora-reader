@@ -29,12 +29,15 @@ npm run dev
 | `npm run build` | ビルド |
 | `npm test` | ユニットテスト |
 | `npm run typecheck` | 型検査 |
-| `npm run dist` | macOS 向け dmg を作る |
+| `npm run dist` | macOS 向け dmg を作る(arm64 と x64 の2つ) |
 | `npm run dist:win` | Windows 向け NSIS インストーラを作る |
 
 配布物は `v0.2.0` のようなタグを push すると GitHub Actions が両 OS 分を作り、
 下書きの Release にまとめる(`.github/workflows/release.yml`)。
 タグと `package.json` の `version` は揃えること。食い違うとビルド前に止まる。
+
+`npm run dist` は Intel Mac 向けの dmg も作るので、手元で片方だけ要るときは
+`npm run dist -- --arm64` のようにアーキテクチャを指定する。
 
 `npm run dist:win` を Apple Silicon の Mac で走らせると、アプリの梱包までは
 進むがインストーラの生成で止まる。electron-builder が持つ `makensis` が
