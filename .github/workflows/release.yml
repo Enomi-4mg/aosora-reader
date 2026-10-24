@@ -99,6 +99,7 @@ jobs:
           # 中間生成物なので拾わない。latest*.yml は更新確認で読む版情報。
           path: |
             dist/*.dmg
+            dist/*.zip
             dist/*.exe
             dist/*.blockmap
             dist/latest*.yml
