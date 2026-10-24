@@ -21,12 +21,9 @@ mac:
       arch:
         - arm64
         - x64
-    # 自動更新(Squirrel.Mac)は dmg を受け取れないので zip も出す。
-    # 人が落とすのは dmg、更新が落とすのは zip、という住み分け。
-    - target: zip
-      arch:
-        - arm64
-        - x64
+    # 自動更新をやるなら zip も要る(Squirrel.Mac は dmg を受け取れない)。
+    # 署名しない方針なので自動更新は実装せず、zip も出さない。
+    # 詳細は docs/SIGNING.md。
   category: public.app-category.book
   darkModeSupport: true
 win:
