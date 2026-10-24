@@ -43,8 +43,9 @@ npm run dev
 進むがインストーラの生成で止まる。electron-builder が持つ `makensis` が
 x86_64 バイナリで、Rosetta を要求するため。Windows か CI で作るほうが早い。
 
-配布物にはまだ署名していないので、Windows は SmartScreen、macOS は Gatekeeper の
-警告が出る。署名の方針と手順は[コード署名の方針](docs/SIGNING.md)にまとめてある。
+配布物に署名していないので、Windows は SmartScreen、macOS は Gatekeeper の警告が出る。
+そのため自動更新も行わず、新しい版が出たことを知らせるだけにしてある。
+判断の理由と、見直す場合に要ることは[コード署名の方針](docs/SIGNING.md)にまとめてある。
 
 ## 設計の核 — 2つの不変条件
 
