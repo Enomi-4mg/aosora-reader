@@ -13,7 +13,8 @@ const ipcApi = Object.fromEntries(
 
 const api: AozoraApi = {
   ...ipcApi,
-  getPathForFile: (file) => webUtils.getPathForFile(file)
+  getPathForFile: (file) => webUtils.getPathForFile(file),
+  platform: process.platform
 }
 
 contextBridge.exposeInMainWorld('aozora', api)

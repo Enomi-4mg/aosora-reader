@@ -147,6 +147,11 @@ export interface AozoraIpcApi {
 export interface AozoraApi extends AozoraIpcApi {
   /** Electron が保持する File の実パスを preload 内で安全に解決する。 */
   getPathForFile(file: File): string
+  /**
+   * 動作中の OS。ショートカットの表記とタイトルバーの余白が OS で変わる。
+   * IPC ではなく preload が同期で渡すので、最初の描画から確定している。
+   */
+  platform: NodeJS.Platform
 }
 
 /** ipcRenderer.invoke のチャネル名。AozoraIpcApi のキーと一対一。 */

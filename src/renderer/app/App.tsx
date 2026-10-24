@@ -8,6 +8,7 @@ import { DEFAULT_SETTINGS } from '@shared/model/settings'
 import { useLibraryStore } from '../state/useLibraryStore'
 import { importablePathsFromFiles } from '../library/dropImport'
 import { useFullscreen } from '../hooks/useFullscreen'
+import { applyPlatformAttribute } from '../platform'
 
 export function App(): JSX.Element {
   const readerSettings = useSettingsStore()
@@ -20,6 +21,9 @@ export function App(): JSX.Element {
   useEffect(() => {
     void Promise.all([readerSettings.load(), appSettings.load()])
   }, [])
+
+  // ウィンドウ操作ボタンの位置が OS で変わる。余白の出し分けは CSS 側に任せる。
+  useEffect(applyPlatformAttribute, [])
 
   // テーマは data-theme で切り替える。system は CSS 側で prefers-color-scheme に追従。
   useEffect(() => {

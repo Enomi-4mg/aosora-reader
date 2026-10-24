@@ -2,6 +2,7 @@ import { useMemo, useState, type JSX } from 'react'
 import { useAnnotationsStore } from '../state/useAnnotationsStore'
 import { useReaderStore, type SidebarTab } from '../state/useReaderStore'
 import type { TextPosition } from '@shared/model/position'
+import { MOD } from '../platform'
 
 interface Props {
   onJump: (position: TextPosition) => void
@@ -64,7 +65,7 @@ export function AnnotationsPanel({ onJump }: Props): JSX.Element {
       {annotations.error && <p className="panel-error">{annotations.error}</p>}
 
       {reader.sidebarTab === 'annotations' && (
-        <AnnotationList empty="注釈はまだありません。本文を選択するか、⌘B で栞を追加できます。">
+        <AnnotationList empty={`注釈はまだありません。本文を選択するか、${MOD}B で栞を追加できます。`}>
           {all.map((item) => (
             <li key={`${item.kind}-${item.id}`} className="annotation-item all-item">
               <span className="annotation-kind">{item.kind}</span>
@@ -76,7 +77,7 @@ export function AnnotationsPanel({ onJump }: Props): JSX.Element {
       )}
 
       {reader.sidebarTab === 'bookmarks' && (
-        <AnnotationList empty="栞はまだありません。⌘B で現在位置に追加できます。">
+        <AnnotationList empty={`栞はまだありません。${MOD}B で現在位置に追加できます。`}>
           {bookmarks.map((item) => (
             <li key={item.id} className="annotation-item bookmark-item">
               {editing?.kind === 'bookmark' && editing.id === item.id ? (
