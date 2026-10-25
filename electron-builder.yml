@@ -23,7 +23,8 @@ mac:
         - x64
     # 自動更新をやるなら zip も要る(Squirrel.Mac は dmg を受け取れない)。
     # 署名しない方針なので自動更新は実装せず、zip も出さない。
-    # 詳細は docs/SIGNING.md。
+    # 署名は mac が Apple Developer Program(年 99 USD)、Windows は
+    # SignPath Foundation(OSS 枠・無償)。再開するならそこから。
   category: public.app-category.book
   darkModeSupport: true
 win:
